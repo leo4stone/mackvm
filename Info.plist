@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleExecutable</key>
+	<string>MacKVM</string>
+	<key>CFBundleIdentifier</key>
+	<string>io.github.leo4stone.mackvm</string>
+	<key>CFBundleName</key>
+	<string>MacKVM</string>
+	<key>CFBundleDisplayName</key>
+	<string>MacKVM</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>15.8</string>
+	<key>CFBundleVersion</key>
+	<string>15</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>26.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>MacKVM 需要在局域网里查找并连接另一台 Mac，用于配对和转发键盘鼠标输入。</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_mackvm._tcp</string>
+		<string>_mackvm-pair._tcp</string>
+	</array>
+</dict>
+</plist>

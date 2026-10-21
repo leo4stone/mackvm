@@ -1,0 +1,1247 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC%3Awght%40100..900&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      *, ::before, ::after {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div style="height: 620px; position: relative; width: 1880px">
+      <div
+        data-pencil-name="06 · 配对完成 / 查看连接与调整位置"
+        style="align-items: flex-start; background-color: #F7F8FA; border-radius: 14px; box-sizing: border-box; display: flex; flex-direction: column; gap: 0px; height: 620px; justify-content: flex-start; left: 0px; outline-offset: -0.5px; outline: 1px solid #E3E7EE; overflow: hidden; position: absolute; top: 0px; width: 900px"
+      >
+        <div
+          data-pencil-name="窗口标题栏"
+          style="align-items: center; background-color: #F0F2F5; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 8px; height: 54px; justify-content: flex-start; padding: 0px 20px; position: relative; width: 100%"
+        >
+          <div
+            data-pencil-name="窗口控制"
+            style="background-color: #FF6059; border-radius: 50%; box-sizing: border-box; flex-shrink: 0; height: 12px; position: relative; width: 12px; z-index: 0"
+          ></div>
+          <div
+            data-pencil-name="窗口控制"
+            style="background-color: #FFBD2E; border-radius: 50%; box-sizing: border-box; flex-shrink: 0; height: 12px; position: relative; width: 12px; z-index: 1"
+          ></div>
+          <div
+            data-pencil-name="窗口控制"
+            style="background-color: #28C840; border-radius: 50%; box-sizing: border-box; flex-shrink: 0; height: 12px; position: relative; width: 12px; z-index: 2"
+          ></div>
+          <div
+            data-pencil-name="应用名称"
+            style="align-items: center; box-sizing: border-box; display: flex; flex-direction: row; gap: 0px; height: 54px; justify-content: center; left: 350px; position: absolute; top: 0px; width: 200px; z-index: 3"
+          >
+            <div
+              data-pencil-name="MacKVM"
+              style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 14px; font-style: normal; font-weight: 600; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+            >
+              MacKVM
+            </div>
+          </div>
+          <div
+            data-pencil-name="标题栏弹性间隔"
+            style="align-items: flex-start; box-sizing: border-box; display: flex; flex-direction: row; flex: 1 1 0; gap: 0px; height: 1px; justify-content: flex-start; position: relative; z-index: 4"
+          ></div>
+          <div
+            data-pencil-name="功能切换"
+            style="align-items: flex-start; background-color: #E5E9F0; border-radius: 8px; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 2px; height: fit-content; justify-content: flex-start; padding: 3px; position: relative; width: fit-content; z-index: 5"
+          >
+            <div
+              data-pencil-name="设备连接"
+              style="align-items: flex-start; background-color: #FFFFFF; border-radius: 6px; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: fit-content; justify-content: flex-start; padding: 6px 14px; width: fit-content"
+            >
+              <div
+                data-pencil-name="设备连接"
+                style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 13px; font-style: normal; font-weight: 600; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+              >
+                设备连接
+              </div>
+            </div>
+            <div
+              data-pencil-name="光标特效"
+              style="align-items: flex-start; background-color: #F0F2F5; border-radius: 6px; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: fit-content; justify-content: flex-start; padding: 6px 14px; width: fit-content"
+            >
+              <div
+                data-pencil-name="光标特效"
+                style='box-sizing: border-box; color: #6B7482; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 13px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+              >
+                光标特效
+              </div>
+            </div>
+          </div>
+        </div>
+        <div
+          data-pencil-name="内容"
+          style="align-items: flex-start; box-sizing: border-box; display: flex; flex-direction: column; flex: 1 1 0; gap: 16px; justify-content: flex-start; padding: 28px 32px 24px 32px; width: 100%"
+        >
+          <div
+            data-pencil-name="连接概览"
+            style="align-items: center; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 12px; height: fit-content; justify-content: flex-start; width: 100%"
+          >
+            <div
+              data-pencil-name="标题"
+              style="align-items: flex-start; box-sizing: border-box; display: flex; flex-direction: column; flex: 1 1 0; gap: 6px; height: fit-content; justify-content: flex-start"
+            >
+              <div
+                data-pencil-name="两台 Mac，一套键鼠。"
+                style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 26px; font-style: normal; font-weight: 600; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+              >
+                两台 Mac，一套键鼠。
+              </div>
+              <div
+                data-pencil-name="已配对「书房 Mac mini」· 断线后会自动重连"
+                style='box-sizing: border-box; color: #6B7482; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 13px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+              >
+                已配对「书房 Mac mini」· 断线后会自动重连
+              </div>
+            </div>
+            <div
+              data-pencil-name="连接状态 · 点击查看说明"
+              style="align-items: center; background-color: #E4F4EC; border-radius: 20px; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 6px; height: fit-content; justify-content: flex-start; padding: 7px 12px; width: fit-content"
+            >
+              <div
+                data-pencil-name="在线"
+                style="background-color: #248451; border-radius: 50%; box-sizing: border-box; flex-shrink: 0; height: 6px; width: 6px"
+              ></div>
+              <div
+                data-pencil-name="已连接"
+                style='box-sizing: border-box; color: #237A4D; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 12px; font-style: normal; font-weight: 500; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+              >
+                已连接
+              </div>
+              <svg
+                data-pencil-name="展开连接状态说明"
+                data-icon-name="chevron-down"
+                data-icon-set="lucide"
+                viewBox="0 0 13.99993896484375 14"
+                preserveAspectRatio="xMidYMid meet"
+                xmlns="http://www.w3.org/2000/svg"
+                style="box-sizing: border-box; flex-shrink: 0; height: 12px; width: 12px"
+              >
+                <path
+                  d="M3.34619 4.68945q-0.25293 0.08545-0.37939 0.30762-0.04102 0.08545-0.04102 0.25293 0 0.16748 0.04785 0.25977 0.05127 0.08887 1.8628 1.9038 1.81494 1.81152 1.9038 1.8628 0.09229 0.04785 0.25977 0.04785 0.16748 0 0.25635-0.04785 0.09229-0.05127 1.90381-1.8628 1.81494-1.81494 1.86279-1.9038 0.05127-0.09229 0.05127-0.25977 0-0.16748-0.04102-0.25293-0.09912-0.16748-0.28027-0.2666-0.05811-0.02734-0.09912-0.04102-0.04102-0.01367-0.15381-0.01367-0.11279 0-0.15381 0.01367-0.04101 0.01367-0.11279 0.04102-0.09912 0.05811-1.66455 1.62695l-1.56885 1.56543-2.82666-2.81299q-0.31104-0.29395-0.42041-0.37939-0.08545-0.05469-0.19824-0.05469l-0.02735 0q-0.14014 0-0.18115 0.01367z"
+                  fill="#237A4D"
+                ></path>
+              </svg>
+            </div>
+            <div
+              data-pencil-name="解除配对"
+              style="align-items: flex-start; background-color: #FFFFFF; border-radius: 8px; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: fit-content; justify-content: flex-start; outline-offset: -0.5px; outline: 1px solid #E3E7EE; padding: 9px 16px; width: fit-content"
+            >
+              <div
+                data-pencil-name="解除配对"
+                style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 13px; font-style: normal; font-weight: 500; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+              >
+                解除配对
+              </div>
+            </div>
+          </div>
+          <div
+            data-pencil-name="设备相对位置"
+            style="align-items: center; background-color: #EDF2FA; border-radius: 12px; box-sizing: border-box; display: flex; flex-direction: column; flex-shrink: 0; gap: 16px; height: 350px; justify-content: center; width: 100%"
+          >
+            <div
+              data-pencil-name="水平相邻设备"
+              style="align-items: center; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 24px; height: fit-content; justify-content: flex-start; width: fit-content"
+            >
+              <div
+                data-pencil-name="本机与四向位置控制"
+                style="align-items: center; box-sizing: border-box; display: flex; flex-direction: column; flex-shrink: 0; gap: 10px; height: fit-content; justify-content: flex-start; width: fit-content"
+              >
+                <div
+                  data-pencil-name="↑ 上"
+                  style="align-items: center; background-color: #FFFFFF; border-radius: 8px; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: 32px; justify-content: center; outline-offset: -0.5px; outline: 1px solid #E3E7EE; width: 60px"
+                >
+                  <div
+                    data-pencil-name="↑ 上"
+                    style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 13px; font-style: normal; font-weight: 500; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    ↑ 上
+                  </div>
+                </div>
+                <div
+                  data-pencil-name="本机左右方向"
+                  style="align-items: center; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 12px; height: fit-content; justify-content: flex-start; width: fit-content"
+                >
+                  <div
+                    data-pencil-name="← 左"
+                    style="align-items: center; background-color: #FFFFFF; border-radius: 8px; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: 32px; justify-content: center; outline-offset: -0.5px; outline: 1px solid #E3E7EE; width: 60px"
+                  >
+                    <div
+                      data-pencil-name="← 左"
+                      style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 13px; font-style: normal; font-weight: 500; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                    >
+                      ← 左
+                    </div>
+                  </div>
+                  <div
+                    data-pencil-name="我的 MacBook Pro"
+                    style="align-items: center; background-color: #E0EAFE; border-radius: 10px; box-sizing: border-box; display: flex; flex-direction: column; flex-shrink: 0; gap: 10px; height: 220px; justify-content: flex-start; outline-offset: -1px; outline: 2px solid #6A96EC; padding: 20px; width: 280px"
+                  >
+                    <div
+                      data-pencil-name="输入设备 · 显示器连接键盘鼠标"
+                      style="box-sizing: border-box; flex-shrink: 0; height: 72px; position: relative; width: 72px"
+                    >
+                      <div
+                        data-pencil-name="精细显示器图标"
+                        style="box-sizing: border-box; height: 72px; left: 0px; overflow: hidden; position: absolute; top: 0px; width: 72px; z-index: 0"
+                      >
+                        <svg
+                          viewBox="4.76837158203125e-7 0 62.26758909225464 39.45930862426758"
+                          preserveAspectRatio="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                          style="box-sizing: border-box; height: 39.459px; left: 4.295px; overflow: visible; position: absolute; top: 12.414px; width: 62.268px; z-index: 0"
+                        >
+                          <path
+                            d="M60.5131 0l-58.8 0c-0.98483 0-1.7131 0.74483-1.7131 1.68828l0 36.04137c0 0.97655 0.79448 1.72966 1.7131 1.72966l58.8 0c0.96001 0 1.75449-0.7531 1.75449-1.66345l0-36.10758c0-0.94345-0.79448-1.68828-1.75449-1.68828z"
+                            fill="none"
+                            stroke="#2869E8"
+                            stroke-width="1.5"
+                            stroke-linecap="butt"
+                            stroke-linejoin="miter"
+                            vector-effect="non-scaling-stroke"
+                          ></path>
+                        </svg>
+                        <svg
+                          viewBox="0 0 62.2675895690918 1"
+                          preserveAspectRatio="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                          style="box-sizing: border-box; height: 1.5px; left: 4.295px; overflow: visible; position: absolute; top: 48.67px; width: 62.268px; z-index: 1"
+                        >
+                          <path
+                            d="M0 0l62.26759 0"
+                            fill="none"
+                            stroke="#2869E8"
+                            stroke-width="1.5"
+                            stroke-linecap="butt"
+                            stroke-linejoin="miter"
+                            vector-effect="non-scaling-stroke"
+                          ></path>
+                        </svg>
+                        <svg
+                          viewBox="0 0 1 8.300689697265625"
+                          preserveAspectRatio="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                          style="box-sizing: border-box; height: 8.301px; left: 32.383px; overflow: visible; position: absolute; top: 51.873px; width: 1.5px; z-index: 2"
+                        >
+                          <path
+                            d="M0 0l0 8.30069"
+                            fill="none"
+                            stroke="#2869E8"
+                            stroke-width="1.5"
+                            stroke-linecap="butt"
+                            stroke-linejoin="miter"
+                            vector-effect="non-scaling-stroke"
+                          ></path>
+                        </svg>
+                        <svg
+                          viewBox="0 0 1 8.300689697265625"
+                          preserveAspectRatio="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                          style="box-sizing: border-box; height: 8.301px; left: 38.557px; overflow: visible; position: absolute; top: 51.873px; width: 1.5px; z-index: 3"
+                        >
+                          <path
+                            d="M0 0l0 8.30069"
+                            fill="none"
+                            stroke="#2869E8"
+                            stroke-width="1.5"
+                            stroke-linecap="butt"
+                            stroke-linejoin="miter"
+                            vector-effect="non-scaling-stroke"
+                          ></path>
+                        </svg>
+                        <svg
+                          viewBox="-5.364418029785156e-7 0 25.27447944879532 1.241379976272583"
+                          preserveAspectRatio="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                          style="box-sizing: border-box; height: 1.5px; left: 22.759px; overflow: visible; position: absolute; top: 60.174px; width: 25.275px; z-index: 4"
+                        >
+                          <path
+                            d="M24.62069 0l-23.98345 0c-0.38897 0-0.63724 0.28138-0.63724 0.62069 0 0.33931 0.28138 0.62069 0.63724 0.62069l23.98345 0c0.36414 0 0.65379-0.25655 0.65379-0.62069 0-0.36414-0.26482-0.62069-0.65379-0.62069z"
+                            fill="none"
+                            stroke="#2869E8"
+                            stroke-width="1.5"
+                            stroke-linecap="butt"
+                            stroke-linejoin="miter"
+                            vector-effect="non-scaling-stroke"
+                          ></path>
+                        </svg>
+                      </div>
+                      <div
+                        data-pencil-name="连接的键盘鼠标"
+                        style="align-items: center; box-sizing: border-box; display: flex; flex-direction: row; gap: 5px; height: 22px; justify-content: flex-start; left: 14px; position: absolute; top: 20px; width: 44px; z-index: 1"
+                      >
+                        <svg
+                          data-pencil-name="键盘"
+                          data-icon-name="keyboard"
+                          data-icon-set="lucide"
+                          viewBox="0 0 13.99993896484375 14"
+                          preserveAspectRatio="xMidYMid meet"
+                          xmlns="http://www.w3.org/2000/svg"
+                          style="box-sizing: border-box; flex-shrink: 0; height: 22px; width: 25px"
+                        >
+                          <path
+                            d="M2.05762 1.77734q-0.28027 0.04102-0.53321 0.16748-0.34863 0.19824-0.58789 0.50586-0.23584 0.30762-0.32129 0.70069-0.01367 0.10938-0.02734 0.66992l0 3.17871 0 3.17871q0.01367 0.56055 0.02734 0.66992 0.11279 0.5332 0.50245 0.90577 0.39307 0.36914 0.92627 0.46826 0.16748 0.02734 4.95605 0.02734 4.78857 0 4.95605-0.02734 0.5332-0.09912 0.92286-0.46826 0.39307-0.37256 0.50586-0.90577 0.01367-0.10938 0.02734-0.66992l0-3.17871 0-3.17871q-0.01367-0.56055-0.02734-0.66992-0.12647-0.54688-0.53321-0.92285-0.40674-0.37939-0.95019-0.46485-0.1709-0.01367-4.93897-0.01367-4.76465 0-4.90478 0.02734z m9.81298 1.17579q0.21192 0.08545 0.32471 0.29394l0.04102 0.09912 0 7.30762-0.04102 0.09912q-0.11279 0.2085-0.32471 0.29395l-0.0957 0.02734-9.5498 0-0.09571-0.02734q-0.21191-0.08545-0.3247-0.29395l-0.04102-0.09912 0-7.30762 0.04102-0.09912q0.04443-0.08203 0.1333-0.16406 0.09229-0.08545 0.16748-0.1128 0.07861-0.03076 0.70752-0.04443l4.18701 0 4.18701 0q0.61523 0 0.68359 0.02734z m-8.46972 1.14843q-0.18115 0.02734-0.32129 0.16748-0.2085 0.21191-0.15381 0.50586 0.05469 0.29395 0.32129 0.42041 0.09912 0.04102 0.25293 0.04102 0.25293 0 0.42041-0.16748 0.12646-0.12646 0.15381-0.30762 0.05469-0.29395-0.15723-0.50244-0.2085-0.21191-0.51611-0.15723z m2.32422 0q-0.18115 0.02734-0.32129 0.18115-0.14014 0.15381-0.15381 0.35206-0.01367 0.23584 0.16064 0.42724 0.17432 0.18799 0.42725 0.18799 0.19482 0 0.34863-0.11963 0.15381-0.11963 0.2085-0.30762 0.05811-0.18799-0.02051-0.37597-0.0752-0.19141-0.24951-0.28711-0.17432-0.09912-0.3999-0.05811z m2.35156 0q-0.23584 0.02734-0.38281 0.23242-0.14697 0.20166-0.09229 0.44092 0.02734 0.18115 0.15381 0.29395 0.16748 0.16748 0.42041 0.16748 0.14014 0 0.23926-0.04102 0.2085-0.09912 0.28369-0.29394 0.07861-0.19824 0.03076-0.39991-0.04785-0.20508-0.23242-0.32128-0.18115-0.11963-0.42041-0.07862z m2.32422 0q-0.18115 0.02734-0.32129 0.16748-0.2085 0.21191-0.15381 0.50586 0.05469 0.29395 0.32129 0.42041 0.09912 0.04102 0.25293 0.04102 0.25293 0 0.42041-0.16748 0.12646-0.12646 0.15381-0.30762 0.05469-0.29395-0.15723-0.50244-0.2085-0.21191-0.51611-0.15723z m-5.91992 2.35156q-0.18457 0.05811-0.29053 0.21192-0.10254 0.15381-0.10254 0.33496 0 0.23926 0.17432 0.41357 0.17432 0.17432 0.42041 0.16065 0.24609-0.01367 0.3999-0.16748 0.09912-0.09912 0.12646-0.18115 0.02734-0.08545 0.02735-0.23926 0-0.15381-0.04102-0.23926-0.08545-0.18115-0.2666-0.2666-0.08545-0.04102-0.23242-0.05469-0.14697-0.01367-0.21533 0.02734z m2.36523-0.01367q-0.25293 0.08545-0.37939 0.30762-0.04102 0.08545-0.04102 0.23926 0 0.15381 0.03418 0.23926 0.0376 0.08203 0.1333 0.18115 0.15381 0.15381 0.3999 0.16748 0.24609 0.01367 0.42041-0.16065 0.17432-0.17432 0.17432-0.41357 0-0.23926-0.16748-0.3999-0.16748-0.16064-0.39307-0.17432-0.14014 0-0.18115 0.01367z m2.2832 0.01367q-0.09912 0.04443-0.1914 0.12989-0.08887 0.08203-0.12647 0.16064-0.03418 0.0752-0.04101 0.11621-0.00684 0.04102-0.00684 0.14014 0 0.15381 0.04102 0.25293 0.11279 0.2085 0.32129 0.28711 0.21191 0.0752 0.42041 0 0.21191-0.07861 0.3247-0.28711 0.04102-0.09912 0.04102-0.25293 0-0.09912-0.00684-0.14014-0.00684-0.04102-0.03418-0.11279-0.05811-0.08203-0.14355-0.16406-0.08203-0.08545-0.18115-0.11963-0.0957-0.0376-0.21534-0.0376-0.11963 0-0.20166 0.02734z m-5.18164 2.31055q-0.08545 0.02734-0.18457 0.09229-0.0957 0.06152-0.15039 0.1333-0.12646 0.16748-0.11279 0.38623 0.01367 0.21533 0.18115 0.36914 0.12646 0.12646 0.29395 0.15381 0.11279 0.02734 3.0249 0.02734 2.91211 0 3.0249-0.02734 0.16748-0.02734 0.29395-0.15381 0.22217-0.22559 0.16748-0.51953-0.05469-0.29395-0.35205-0.43408l-0.08203-0.02735-3.01123-0.01367q-3.02148 0-3.09327 0.01367z"
+                            fill="#2869E8"
+                          ></path>
+                        </svg>
+                        <svg
+                          data-pencil-name="鼠标"
+                          data-icon-name="mouse"
+                          data-icon-set="lucide"
+                          viewBox="0 0 13.99993896484375 14"
+                          preserveAspectRatio="xMidYMid meet"
+                          xmlns="http://www.w3.org/2000/svg"
+                          style="box-sizing: border-box; flex-shrink: 0; height: 22px; width: 14px"
+                        >
+                          <path
+                            d="M6.7334 0.60156q-0.88184 0.04102-1.69531 0.42041-0.81006 0.37939-1.4253 1.02198-0.61523 0.64258-0.95361 1.48339-0.22217 0.54687-0.29395 1.20313-0.02734 0.19824-0.02734 2.26953 0 2.07129 0.02734 2.26953 0.22559 1.76367 1.49707 2.93945 0.95361 0.86816 2.22852 1.11768 0.43408 0.08545 0.90918 0.08545 1.13477 0 2.14307-0.51953 0.93652-0.48877 1.5791-1.33643 0.646-0.84766 0.85449-1.89697 0.07178-0.32129 0.07861-0.64941 0.00684-0.32813 0.00684-1.96875l0-0.08204q0-1.64063-0.00684-1.96875-0.00683-0.32813-0.07861-0.64941-0.18115-0.90918-0.70068-1.67822-0.51611-0.77246-1.28858-1.28858-0.76904-0.51953-1.67822-0.70068-0.54688-0.09912-1.17578-0.07178z m0.58789 1.16211q1.22021 0.12646 2.11572 0.98096 0.44775 0.43408 0.71094 0.99463 0.2666 0.55713 0.33838 1.18945 0.01367 0.19482 0.01367 2.07129 0 1.87646-0.01367 2.07129-0.11279 1.09375-0.79981 1.90381-0.48877 0.60156-1.17578 0.92627-0.71436 0.34863-1.51074 0.34863-0.79639 0-1.52441-0.34863-0.49219-0.23926-0.88526-0.61865-0.9502-0.90918-1.07666-2.21143-0.01367-0.19482-0.01367-2.07129 0-1.87646 0.01367-2.07129 0.11279-1.09375 0.79981-1.90381 0.48877-0.58789 1.16211-0.90918 0.86475-0.43408 1.8457-0.35205z m-0.4751 1.17578q-0.25293 0.08545-0.37939 0.30762l-0.04102 0.08545 0 2.46436q0 0.18115 0.03418 0.2666 0.0376 0.08203 0.11963 0.16748 0.08545 0.08203 0.18799 0.1333 0.10596 0.04785 0.23242 0.04785 0.12646 0 0.229-0.04785 0.10596-0.05127 0.18799-0.1333 0.08545-0.08545 0.11963-0.16748 0.0376-0.08545 0.0376-0.2666l0-2.46436-0.04102-0.08545q-0.09912-0.18115-0.28027-0.2666-0.08545-0.04102-0.22559-0.04785-0.14014-0.00684-0.18115 0.00683z"
+                            fill="#2869E8"
+                          ></path>
+                        </svg>
+                      </div>
+                    </div>
+                    <div
+                      data-pencil-name="我的 MacBook Pro"
+                      style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 16px; font-style: normal; font-weight: 600; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                    >
+                      我的 MacBook Pro
+                    </div>
+                    <div
+                      data-pencil-name="本机 · 键鼠接在这里"
+                      style='box-sizing: border-box; color: #6B7482; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 12px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                    >
+                      本机 · 键鼠接在这里
+                    </div>
+                    <div
+                      data-pencil-name="操作区对齐留白"
+                      style="align-items: flex-start; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: 27px; justify-content: flex-start; width: 1px"
+                    ></div>
+                  </div>
+                  <div
+                    data-pencil-name="→ 右"
+                    style="align-items: center; background-color: #2869E8; border-radius: 8px; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: 32px; justify-content: center; outline-offset: -0.5px; outline: 1px solid #2869E8; width: 60px"
+                  >
+                    <div
+                      data-pencil-name="→ 右"
+                      style='box-sizing: border-box; color: #FFFFFF; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 13px; font-style: normal; font-weight: 500; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                    >
+                      → 右
+                    </div>
+                  </div>
+                </div>
+                <div
+                  data-pencil-name="↓ 下"
+                  style="align-items: center; background-color: #FFFFFF; border-radius: 8px; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: 32px; justify-content: center; outline-offset: -0.5px; outline: 1px solid #E3E7EE; width: 60px"
+                >
+                  <div
+                    data-pencil-name="↓ 下"
+                    style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 13px; font-style: normal; font-weight: 500; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    ↓ 下
+                  </div>
+                </div>
+              </div>
+              <div
+                data-pencil-name="书房 Mac mini"
+                style="align-items: center; background-color: #FFFFFF; border-radius: 10px; box-sizing: border-box; display: flex; flex-direction: column; flex-shrink: 0; gap: 10px; height: 220px; justify-content: flex-start; outline-offset: -1px; outline: 2px solid #BFCADB; padding: 20px; width: 280px"
+              >
+                <div
+                  data-pencil-name="受控显示器图标区域 · 与主控等高"
+                  style="align-items: center; box-sizing: border-box; display: flex; flex-direction: column; flex-shrink: 0; gap: 0px; height: 72px; justify-content: flex-start; width: 72px"
+                >
+                  <div
+                    data-pencil-name="精细受控显示器图标"
+                    style="box-sizing: border-box; flex-shrink: 0; height: 72px; overflow: hidden; position: relative; width: 72px"
+                  >
+                    <svg
+                      viewBox="4.76837158203125e-7 0 62.26758909225464 39.45930862426758"
+                      preserveAspectRatio="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                      style="box-sizing: border-box; height: 39.459px; left: 4.295px; overflow: visible; position: absolute; top: 12.414px; width: 62.268px; z-index: 0"
+                    >
+                      <path
+                        d="M60.5131 0l-58.8 0c-0.98483 0-1.7131 0.74483-1.7131 1.68828l0 36.04137c0 0.97655 0.79448 1.72966 1.7131 1.72966l58.8 0c0.96001 0 1.75449-0.7531 1.75449-1.66345l0-36.10758c0-0.94345-0.79448-1.68828-1.75449-1.68828z"
+                        fill="none"
+                        stroke="#53647D"
+                        stroke-width="1.5"
+                        stroke-linecap="butt"
+                        stroke-linejoin="miter"
+                        vector-effect="non-scaling-stroke"
+                      ></path>
+                    </svg>
+                    <svg
+                      viewBox="0 0 62.2675895690918 1"
+                      preserveAspectRatio="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                      style="box-sizing: border-box; height: 1.5px; left: 4.295px; overflow: visible; position: absolute; top: 48.67px; width: 62.268px; z-index: 1"
+                    >
+                      <path
+                        d="M0 0l62.26759 0"
+                        fill="none"
+                        stroke="#53647D"
+                        stroke-width="1.5"
+                        stroke-linecap="butt"
+                        stroke-linejoin="miter"
+                        vector-effect="non-scaling-stroke"
+                      ></path>
+                    </svg>
+                    <svg
+                      viewBox="0 0 1 8.300689697265625"
+                      preserveAspectRatio="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                      style="box-sizing: border-box; height: 8.301px; left: 32.383px; overflow: visible; position: absolute; top: 51.873px; width: 1.5px; z-index: 2"
+                    >
+                      <path
+                        d="M0 0l0 8.30069"
+                        fill="none"
+                        stroke="#53647D"
+                        stroke-width="1.5"
+                        stroke-linecap="butt"
+                        stroke-linejoin="miter"
+                        vector-effect="non-scaling-stroke"
+                      ></path>
+                    </svg>
+                    <svg
+                      viewBox="0 0 1 8.300689697265625"
+                      preserveAspectRatio="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                      style="box-sizing: border-box; height: 8.301px; left: 38.557px; overflow: visible; position: absolute; top: 51.873px; width: 1.5px; z-index: 3"
+                    >
+                      <path
+                        d="M0 0l0 8.30069"
+                        fill="none"
+                        stroke="#53647D"
+                        stroke-width="1.5"
+                        stroke-linecap="butt"
+                        stroke-linejoin="miter"
+                        vector-effect="non-scaling-stroke"
+                      ></path>
+                    </svg>
+                    <svg
+                      viewBox="-5.364418029785156e-7 0 25.27447944879532 1.241379976272583"
+                      preserveAspectRatio="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                      style="box-sizing: border-box; height: 1.5px; left: 22.759px; overflow: visible; position: absolute; top: 60.174px; width: 25.275px; z-index: 4"
+                    >
+                      <path
+                        d="M24.62069 0l-23.98345 0c-0.38897 0-0.63724 0.28138-0.63724 0.62069 0 0.33931 0.28138 0.62069 0.63724 0.62069l23.98345 0c0.36414 0 0.65379-0.25655 0.65379-0.62069 0-0.36414-0.26482-0.62069-0.65379-0.62069z"
+                        fill="none"
+                        stroke="#53647D"
+                        stroke-width="1.5"
+                        stroke-linecap="butt"
+                        stroke-linejoin="miter"
+                        vector-effect="non-scaling-stroke"
+                      ></path>
+                    </svg>
+                  </div>
+                </div>
+                <div
+                  data-pencil-name="书房 Mac mini"
+                  style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 16px; font-style: normal; font-weight: 600; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                >
+                  书房 Mac mini
+                </div>
+                <div
+                  data-pencil-name="对方 · 由本机操作"
+                  style='box-sizing: border-box; color: #6B7482; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 12px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                >
+                  对方 · 由本机操作
+                </div>
+                <div
+                  data-pencil-name="切换为输入设备"
+                  style="align-items: flex-start; background-color: #FFFFFF; border-radius: 8px; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: fit-content; justify-content: flex-start; outline-offset: -0.5px; outline: 1px solid #E3E7EE; padding: 5px 10px; width: fit-content"
+                >
+                  <div
+                    data-pencil-name="切换为输入设备"
+                    style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 12px; font-style: normal; font-weight: 500; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    切换为输入设备
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div
+              data-pencil-name="本机下方跨屏提示"
+              style="align-items: center; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 24px; height: fit-content; justify-content: flex-start; width: 728px"
+            >
+              <div
+                data-pencil-name="从本机屏幕右边缘推出光标，即可操作对方"
+                style='box-sizing: border-box; color: #4E6487; flex-shrink: 0; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 13px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: center; width: 424px'
+              >
+                从本机屏幕右边缘推出光标，即可操作对方
+              </div>
+              <div
+                data-pencil-name="对方设备下方留白"
+                style="align-items: flex-start; box-sizing: border-box; display: flex; flex-direction: row; flex: 1 1 0; gap: 0px; height: 1px; justify-content: flex-start"
+              ></div>
+            </div>
+          </div>
+          <div
+            data-pencil-name="仅支持上、下、左、右四个方向；修改后立即同步到两台设备。"
+            style='box-sizing: border-box; color: #6B7482; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 12px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+          >
+            点击本机屏幕四周的方向按钮，设置对方位置；修改立即同步到两台设备。
+          </div>
+        </div>
+        <div
+          data-pencil-name="后台与紧急收回"
+          style="align-items: center; border-color: #E3E7EE; border-style: solid; border-width: 1px 0px 0px 0px; box-sizing: content-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: 47.5px; justify-content: space-between; margin: -0.5px 0px 0px 0px; padding: 0px 24px; width: 900px"
+        >
+          <div
+            data-pencil-name="关闭窗口后仍在后台运行 · 开机自动启动"
+            style='box-sizing: border-box; color: #6B7482; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 11px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+          >
+            关闭窗口后仍在后台运行 · 开机自动启动
+          </div>
+          <div
+            data-pencil-name="紧急收回光标  ⌃ ⌥ ⌘ L"
+            style='box-sizing: border-box; color: #6B7482; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 12px; font-style: normal; font-weight: 500; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+          >
+            紧急收回光标 ⌃ ⌥ ⌘ L
+          </div>
+        </div>
+      </div>
+      <div
+        data-pencil-name="07 · 按需微调 / 光标特效"
+        style="align-items: flex-start; background-color: #F7F8FA; border-radius: 14px; box-sizing: border-box; display: flex; flex-direction: column; gap: 0px; height: 620px; justify-content: flex-start; left: 980px; outline-offset: -0.5px; outline: 1px solid #E3E7EE; overflow: hidden; position: absolute; top: 0px; width: 900px"
+      >
+        <div
+          data-pencil-name="窗口标题栏"
+          style="align-items: center; background-color: #F0F2F5; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 8px; height: 54px; justify-content: flex-start; padding: 0px 20px; position: relative; width: 100%"
+        >
+          <div
+            data-pencil-name="窗口控制"
+            style="background-color: #FF6059; border-radius: 50%; box-sizing: border-box; flex-shrink: 0; height: 12px; position: relative; width: 12px; z-index: 0"
+          ></div>
+          <div
+            data-pencil-name="窗口控制"
+            style="background-color: #FFBD2E; border-radius: 50%; box-sizing: border-box; flex-shrink: 0; height: 12px; position: relative; width: 12px; z-index: 1"
+          ></div>
+          <div
+            data-pencil-name="窗口控制"
+            style="background-color: #28C840; border-radius: 50%; box-sizing: border-box; flex-shrink: 0; height: 12px; position: relative; width: 12px; z-index: 2"
+          ></div>
+          <div
+            data-pencil-name="应用名称"
+            style="align-items: center; box-sizing: border-box; display: flex; flex-direction: row; gap: 0px; height: 54px; justify-content: center; left: 350px; position: absolute; top: 0px; width: 200px; z-index: 3"
+          >
+            <div
+              data-pencil-name="MacKVM"
+              style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 14px; font-style: normal; font-weight: 600; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+            >
+              MacKVM
+            </div>
+          </div>
+          <div
+            data-pencil-name="标题栏弹性间隔"
+            style="align-items: flex-start; box-sizing: border-box; display: flex; flex-direction: row; flex: 1 1 0; gap: 0px; height: 1px; justify-content: flex-start; position: relative; z-index: 4"
+          ></div>
+          <div
+            data-pencil-name="功能切换"
+            style="align-items: flex-start; background-color: #E5E9F0; border-radius: 8px; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 2px; height: fit-content; justify-content: flex-start; padding: 3px; position: relative; width: fit-content; z-index: 5"
+          >
+            <div
+              data-pencil-name="设备连接"
+              style="align-items: flex-start; background-color: #F0F2F5; border-radius: 6px; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: fit-content; justify-content: flex-start; padding: 6px 14px; width: fit-content"
+            >
+              <div
+                data-pencil-name="设备连接"
+                style='box-sizing: border-box; color: #6B7482; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 13px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+              >
+                设备连接
+              </div>
+            </div>
+            <div
+              data-pencil-name="光标特效"
+              style="align-items: flex-start; background-color: #FFFFFF; border-radius: 6px; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: fit-content; justify-content: flex-start; padding: 6px 14px; width: fit-content"
+            >
+              <div
+                data-pencil-name="光标特效"
+                style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 13px; font-style: normal; font-weight: 600; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+              >
+                光标特效
+              </div>
+            </div>
+          </div>
+        </div>
+        <div
+          data-pencil-name="内容"
+          style="align-items: flex-start; box-sizing: border-box; display: flex; flex-direction: column; flex: 1 1 0; gap: 16px; justify-content: flex-start; padding: 28px 32px 24px 32px; width: 100%"
+        >
+          <div
+            data-pencil-name="波纹总开关"
+            style="align-items: center; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 12px; height: 63px; justify-content: flex-start; width: 100%"
+          >
+            <div
+              data-pencil-name="波纹介绍"
+              style="align-items: flex-start; box-sizing: border-box; display: flex; flex-direction: column; flex: 1 1 0; gap: 6px; height: fit-content; justify-content: flex-start"
+            >
+              <div
+                data-pencil-name="让光标的去向清晰可见"
+                style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 26px; font-style: normal; font-weight: 600; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+              >
+                让光标的去向清晰可见
+              </div>
+              <div
+                data-pencil-name="跨设备时显示波纹 · 修改立即生效，并同步到另一台"
+                style='box-sizing: border-box; color: #6B7482; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 13px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+              >
+                跨设备时显示波纹 · 修改立即生效，并同步到另一台
+              </div>
+            </div>
+            <div
+              data-pencil-name="恢复默认值"
+              style="align-items: flex-start; background-color: #FFFFFF; border-radius: 8px; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: fit-content; justify-content: flex-start; outline-offset: -0.5px; outline: 1px solid #E3E7EE; padding: 9px 16px; width: fit-content"
+            >
+              <div
+                data-pencil-name="恢复默认值"
+                style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 13px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+              >
+                恢复默认值
+              </div>
+            </div>
+            <div
+              data-pencil-name="已开启"
+              style='box-sizing: border-box; color: #6B7482; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 12px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+            >
+              已开启
+            </div>
+            <div
+              data-pencil-name="波纹效果开关 · 开"
+              style="align-items: flex-start; background-color: #2869E8; border-radius: 20px; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: 22px; justify-content: flex-end; padding: 3px; width: 38px"
+            >
+              <div
+                data-pencil-name="开关滑块"
+                style="background-color: #FFFFFF; border-radius: 50%; box-sizing: border-box; flex-shrink: 0; height: 16px; width: 16px"
+              ></div>
+            </div>
+          </div>
+          <div
+            data-pencil-name="波纹参数"
+            style="align-items: flex-start; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 4px; height: 350px; justify-content: flex-start; position: relative; width: 100%"
+          >
+            <div
+              data-pencil-name="离开波纹"
+              style="align-items: flex-start; background-color: #FFFFFF; border-radius: 10px; border: 1px solid #E3E7EE; box-sizing: border-box; display: flex; flex-direction: column; flex: 1 1 0; gap: 10px; height: 100%; justify-content: flex-start; overflow: hidden; padding: 20px; position: relative; z-index: 0"
+            >
+              <div
+                data-pencil-name="离开波纹"
+                style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 16px; font-style: normal; font-weight: 600; letter-spacing: 0px; line-height: normal; position: relative; text-align: left; white-space: nowrap; z-index: 0'
+              >
+                离开波纹
+              </div>
+              <div
+                data-pencil-name="鼠标离开卡片触发预览"
+                style='box-sizing: border-box; color: #6B7482; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 11px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; position: relative; text-align: left; white-space: nowrap; z-index: 1'
+              >
+                鼠标离开这张卡片时，在离开位置播放波纹
+              </div>
+              <div
+                data-pencil-name="环的大小"
+                style="align-items: center; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 12px; height: fit-content; justify-content: flex-start; position: relative; width: 100%; z-index: 2"
+              >
+                <div
+                  data-pencil-name="参数名称"
+                  style="align-items: flex-start; box-sizing: border-box; display: flex; flex-direction: row; flex: 1 1 0; gap: 0px; height: fit-content; justify-content: flex-start"
+                >
+                  <div
+                    data-pencil-name="环的大小"
+                    style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 13px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    环的大小
+                  </div>
+                </div>
+                <div
+                  data-pencil-name="环的大小数值"
+                  style="align-items: center; background-color: #F7F8FA; border-radius: 6px; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: fit-content; justify-content: space-between; outline-offset: -0.5px; outline: 1px solid #E3E7EE; padding: 6px 10px; width: 100px"
+                >
+                  <div
+                    data-pencil-name="70"
+                    style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 12px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    70
+                  </div>
+                  <div
+                    data-pencil-name="⌃⌄"
+                    style='box-sizing: border-box; color: #6B7482; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 10px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    ⌃⌄
+                  </div>
+                </div>
+              </div>
+              <div
+                data-pencil-name="每个环的时长"
+                style="align-items: center; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 12px; height: fit-content; justify-content: flex-start; position: relative; width: 100%; z-index: 3"
+              >
+                <div
+                  data-pencil-name="参数名称"
+                  style="align-items: flex-start; box-sizing: border-box; display: flex; flex-direction: row; flex: 1 1 0; gap: 0px; height: fit-content; justify-content: flex-start"
+                >
+                  <div
+                    data-pencil-name="每个环的时长"
+                    style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 13px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    每个环的时长
+                  </div>
+                </div>
+                <div
+                  data-pencil-name="每个环的时长数值"
+                  style="align-items: center; background-color: #F7F8FA; border-radius: 6px; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: fit-content; justify-content: space-between; outline-offset: -0.5px; outline: 1px solid #E3E7EE; padding: 6px 10px; width: 100px"
+                >
+                  <div
+                    data-pencil-name="0.4 秒"
+                    style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 12px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    0.4 秒
+                  </div>
+                  <div
+                    data-pencil-name="⌃⌄"
+                    style='box-sizing: border-box; color: #6B7482; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 10px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    ⌃⌄
+                  </div>
+                </div>
+              </div>
+              <div
+                data-pencil-name="出环间隔"
+                style="align-items: center; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 12px; height: fit-content; justify-content: flex-start; position: relative; width: 100%; z-index: 4"
+              >
+                <div
+                  data-pencil-name="参数名称"
+                  style="align-items: flex-start; box-sizing: border-box; display: flex; flex-direction: row; flex: 1 1 0; gap: 0px; height: fit-content; justify-content: flex-start"
+                >
+                  <div
+                    data-pencil-name="出环间隔"
+                    style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 13px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    出环间隔
+                  </div>
+                </div>
+                <div
+                  data-pencil-name="出环间隔数值"
+                  style="align-items: center; background-color: #F7F8FA; border-radius: 6px; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: fit-content; justify-content: space-between; outline-offset: -0.5px; outline: 1px solid #E3E7EE; padding: 6px 10px; width: 100px"
+                >
+                  <div
+                    data-pencil-name="0.1 秒"
+                    style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 12px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    0.1 秒
+                  </div>
+                  <div
+                    data-pencil-name="⌃⌄"
+                    style='box-sizing: border-box; color: #6B7482; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 10px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    ⌃⌄
+                  </div>
+                </div>
+              </div>
+              <div
+                data-pencil-name="持续时间"
+                style="align-items: center; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 12px; height: fit-content; justify-content: flex-start; position: relative; width: 100%; z-index: 5"
+              >
+                <div
+                  data-pencil-name="参数名称"
+                  style="align-items: flex-start; box-sizing: border-box; display: flex; flex-direction: row; flex: 1 1 0; gap: 0px; height: fit-content; justify-content: flex-start"
+                >
+                  <div
+                    data-pencil-name="持续时间"
+                    style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 13px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    持续时间
+                  </div>
+                </div>
+                <div
+                  data-pencil-name="持续时间数值"
+                  style="align-items: center; background-color: #F7F8FA; border-radius: 6px; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: fit-content; justify-content: space-between; outline-offset: -0.5px; outline: 1px solid #E3E7EE; padding: 6px 10px; width: 100px"
+                >
+                  <div
+                    data-pencil-name="1 秒"
+                    style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 12px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    1 秒
+                  </div>
+                  <div
+                    data-pencil-name="⌃⌄"
+                    style='box-sizing: border-box; color: #6B7482; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 10px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    ⌃⌄
+                  </div>
+                </div>
+              </div>
+              <div
+                data-pencil-name="波纹颜色"
+                style="align-items: flex-start; box-sizing: border-box; display: flex; flex-direction: column; flex-shrink: 0; gap: 10px; height: fit-content; justify-content: flex-start; position: relative; width: 100%; z-index: 6"
+              >
+                <div
+                  data-pencil-name="波纹颜色标题行 · 与参数行等高"
+                  style="align-items: center; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: 29px; justify-content: flex-start; width: 100%"
+                >
+                  <div
+                    data-pencil-name="波纹颜色标题"
+                    style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 16px; font-style: normal; font-weight: 600; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    波纹颜色
+                  </div>
+                </div>
+                <div
+                  data-pencil-name="离开与进入颜色并排设置"
+                  style="align-items: center; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 12px; height: 29px; justify-content: flex-start; width: 100%"
+                >
+                  <div
+                    data-pencil-name="离开波纹颜色列表"
+                    style="align-items: center; box-sizing: border-box; display: flex; flex-direction: row; flex: 1 1 0; gap: 3px; height: 100%; justify-content: flex-start"
+                  >
+                    <div
+                      data-pencil-name="颜色标签"
+                      style="align-items: flex-start; box-sizing: border-box; display: flex; flex-direction: row; flex: 1 1 0; gap: 0px; height: fit-content; justify-content: flex-start"
+                    >
+                      <div
+                        data-pencil-name="离开波纹"
+                        style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 13px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                      >
+                        离开波纹
+                      </div>
+                    </div>
+                    <div
+                      data-pencil-name="编辑蓝色"
+                      style="align-items: center; background-color: #FFFFFF; border-radius: 4px; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: 20px; justify-content: center; outline-offset: -0.5px; outline: 1px solid #E3E7EE; padding: 2px; width: 18px"
+                    >
+                      <div
+                        data-pencil-name="蓝色色样"
+                        style="background-color: #2869E8; border-radius: 50%; box-sizing: border-box; flex-shrink: 0; height: 12px; width: 12px"
+                      ></div>
+                    </div>
+                    <div
+                      data-pencil-name="编辑紫色"
+                      style="align-items: center; background-color: #FFFFFF; border-radius: 4px; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: 20px; justify-content: center; outline-offset: -0.5px; outline: 1px solid #E3E7EE; padding: 2px; width: 18px"
+                    >
+                      <div
+                        data-pencil-name="紫色色样"
+                        style="background-color: #9166D8; border-radius: 50%; box-sizing: border-box; flex-shrink: 0; height: 12px; width: 12px"
+                      ></div>
+                    </div>
+                    <div
+                      data-pencil-name="编辑青色"
+                      style="align-items: center; background-color: #FFFFFF; border-radius: 4px; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: 20px; justify-content: center; outline-offset: -0.5px; outline: 1px solid #E3E7EE; padding: 2px; width: 18px"
+                    >
+                      <div
+                        data-pencil-name="青色色样"
+                        style="background-color: #27A7A0; border-radius: 50%; box-sizing: border-box; flex-shrink: 0; height: 12px; width: 12px"
+                      ></div>
+                    </div>
+                    <div
+                      data-pencil-name="添加波纹颜色"
+                      style="align-items: center; background-color: #F7F8FA; border-radius: 4px; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: 20px; justify-content: center; outline-offset: -0.5px; outline: 1px solid #E3E7EE; padding: 2px; width: 18px"
+                    >
+                      <svg
+                        data-pencil-name="添加颜色"
+                        data-icon-name="plus"
+                        data-icon-set="lucide"
+                        viewBox="0 0 13.99993896484375 14"
+                        preserveAspectRatio="xMidYMid meet"
+                        xmlns="http://www.w3.org/2000/svg"
+                        style="box-sizing: border-box; flex-shrink: 0; height: 12px; width: 12px"
+                      >
+                        <path
+                          d="M6.90088 2.35156q-0.0957 0.01367-0.17432 0.05127-0.0752 0.03418-0.15381 0.12647-0.0752 0.08887-0.11279 0.16748-0.03418 0.0752-0.03418 0.32812l0 3.40088-3.66748 0-0.08545 0.04102q-0.22217 0.11279-0.30078 0.33838-0.0752 0.22217 0.00684 0.43408 0.05811 0.0957 0.14013 0.18115 0.08545 0.08203 0.16748 0.11963 0.08545 0.03418 0.33838 0.03418l3.40088 0 0 3.40088q0 0.25293 0.03418 0.33838 0.0376 0.08203 0.11963 0.16748 0.08545 0.08203 0.18799 0.1333 0.10596 0.04785 0.23242 0.04785 0.12646 0 0.229-0.04785 0.10596-0.05127 0.18799-0.1333 0.08545-0.08545 0.11963-0.16748 0.0376-0.08545 0.0376-0.33838l0-3.40088 3.40088 0q0.25293 0 0.33496-0.03418 0.08545-0.0376 0.16748-0.11963 0.08545-0.08545 0.1333-0.18799 0.05127-0.10596 0.05127-0.23242 0-0.12646-0.04102-0.23926-0.09912-0.19482-0.29394-0.29394l-0.08545-0.04102-3.66748 0 0-3.38721q0-0.2666-0.02734-0.32128-0.07178-0.19824-0.25293-0.30079-0.18115-0.10596-0.39307-0.06494z"
+                          fill="#6B7482"
+                        ></path>
+                      </svg>
+                    </div>
+                  </div>
+                  <div
+                    data-pencil-name="进入波纹颜色列表"
+                    style="align-items: center; box-sizing: border-box; display: flex; flex-direction: row; flex: 1 1 0; gap: 3px; height: 100%; justify-content: flex-start"
+                  >
+                    <div
+                      data-pencil-name="颜色标签"
+                      style="align-items: flex-start; box-sizing: border-box; display: flex; flex-direction: row; flex: 1 1 0; gap: 0px; height: fit-content; justify-content: flex-start"
+                    >
+                      <div
+                        data-pencil-name="进入波纹"
+                        style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 13px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                      >
+                        进入波纹
+                      </div>
+                    </div>
+                    <div
+                      data-pencil-name="编辑蓝色"
+                      style="align-items: center; background-color: #FFFFFF; border-radius: 4px; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: 20px; justify-content: center; outline-offset: -0.5px; outline: 1px solid #E3E7EE; padding: 2px; width: 18px"
+                    >
+                      <div
+                        data-pencil-name="蓝色色样"
+                        style="background-color: #2869E8; border-radius: 50%; box-sizing: border-box; flex-shrink: 0; height: 12px; width: 12px"
+                      ></div>
+                    </div>
+                    <div
+                      data-pencil-name="编辑紫色"
+                      style="align-items: center; background-color: #FFFFFF; border-radius: 4px; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: 20px; justify-content: center; outline-offset: -0.5px; outline: 1px solid #E3E7EE; padding: 2px; width: 18px"
+                    >
+                      <div
+                        data-pencil-name="紫色色样"
+                        style="background-color: #9166D8; border-radius: 50%; box-sizing: border-box; flex-shrink: 0; height: 12px; width: 12px"
+                      ></div>
+                    </div>
+                    <div
+                      data-pencil-name="编辑青色"
+                      style="align-items: center; background-color: #FFFFFF; border-radius: 4px; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: 20px; justify-content: center; outline-offset: -0.5px; outline: 1px solid #E3E7EE; padding: 2px; width: 18px"
+                    >
+                      <div
+                        data-pencil-name="青色色样"
+                        style="background-color: #27A7A0; border-radius: 50%; box-sizing: border-box; flex-shrink: 0; height: 12px; width: 12px"
+                      ></div>
+                    </div>
+                    <div
+                      data-pencil-name="添加波纹颜色"
+                      style="align-items: center; background-color: #F7F8FA; border-radius: 4px; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: 20px; justify-content: center; outline-offset: -0.5px; outline: 1px solid #E3E7EE; padding: 2px; width: 18px"
+                    >
+                      <svg
+                        data-pencil-name="添加颜色"
+                        data-icon-name="plus"
+                        data-icon-set="lucide"
+                        viewBox="0 0 13.99993896484375 14"
+                        preserveAspectRatio="xMidYMid meet"
+                        xmlns="http://www.w3.org/2000/svg"
+                        style="box-sizing: border-box; flex-shrink: 0; height: 12px; width: 12px"
+                      >
+                        <path
+                          d="M6.90088 2.35156q-0.0957 0.01367-0.17432 0.05127-0.0752 0.03418-0.15381 0.12647-0.0752 0.08887-0.11279 0.16748-0.03418 0.0752-0.03418 0.32812l0 3.40088-3.66748 0-0.08545 0.04102q-0.22217 0.11279-0.30078 0.33838-0.0752 0.22217 0.00684 0.43408 0.05811 0.0957 0.14013 0.18115 0.08545 0.08203 0.16748 0.11963 0.08545 0.03418 0.33838 0.03418l3.40088 0 0 3.40088q0 0.25293 0.03418 0.33838 0.0376 0.08203 0.11963 0.16748 0.08545 0.08203 0.18799 0.1333 0.10596 0.04785 0.23242 0.04785 0.12646 0 0.229-0.04785 0.10596-0.05127 0.18799-0.1333 0.08545-0.08545 0.11963-0.16748 0.0376-0.08545 0.0376-0.33838l0-3.40088 3.40088 0q0.25293 0 0.33496-0.03418 0.08545-0.0376 0.16748-0.11963 0.08545-0.08545 0.1333-0.18799 0.05127-0.10596 0.05127-0.23242 0-0.12646-0.04102-0.23926-0.09912-0.19482-0.29394-0.29394l-0.08545-0.04102-3.66748 0 0-3.38721q0-0.2666-0.02734-0.32128-0.07178-0.19824-0.25293-0.30079-0.18115-0.10596-0.39307-0.06494z"
+                          fill="#6B7482"
+                        ></path>
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div
+                data-pencil-name="前景波纹 · 输入事件穿透"
+                style="box-sizing: border-box; height: 350px; left: 0px; opacity: 0.55; overflow: hidden; position: absolute; top: 0px; width: 416px; z-index: 7"
+              >
+                <div
+                  data-pencil-name="扩散环"
+                  style="border-radius: 50%; box-sizing: border-box; height: 48px; left: 392px; outline-offset: -1px; outline: 2px solid #2869E8; position: absolute; top: 151px; width: 48px; z-index: 0"
+                ></div>
+                <div
+                  data-pencil-name="扩散环"
+                  style="border-radius: 50%; box-sizing: border-box; height: 80px; left: 376px; outline-offset: -1px; outline: 2px solid #9166D8; position: absolute; top: 135px; width: 80px; z-index: 1"
+                ></div>
+                <div
+                  data-pencil-name="扩散环"
+                  style="border-radius: 50%; box-sizing: border-box; height: 112px; left: 360px; outline-offset: -1px; outline: 2px solid #27A7A0; position: absolute; top: 119px; width: 112px; z-index: 2"
+                ></div>
+              </div>
+            </div>
+            <div
+              data-pencil-name="进入波纹"
+              style="align-items: flex-start; background-color: #FFFFFF; border-radius: 10px; border: 1px solid #E3E7EE; box-sizing: border-box; display: flex; flex-direction: column; flex: 1 1 0; gap: 10px; height: 100%; justify-content: flex-start; overflow: hidden; padding: 20px; position: relative; z-index: 1"
+            >
+              <div
+                data-pencil-name="进入波纹"
+                style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 16px; font-style: normal; font-weight: 600; letter-spacing: 0px; line-height: normal; position: relative; text-align: left; white-space: nowrap; z-index: 0'
+              >
+                进入波纹
+              </div>
+              <div
+                data-pencil-name="鼠标进入卡片触发预览"
+                style='box-sizing: border-box; color: #6B7482; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 11px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; position: relative; text-align: left; white-space: nowrap; z-index: 1'
+              >
+                鼠标进入这张卡片时，沿移动轨迹连续出环
+              </div>
+              <div
+                data-pencil-name="环的大小"
+                style="align-items: center; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 12px; height: fit-content; justify-content: flex-start; position: relative; width: 100%; z-index: 2"
+              >
+                <div
+                  data-pencil-name="参数名称"
+                  style="align-items: flex-start; box-sizing: border-box; display: flex; flex-direction: row; flex: 1 1 0; gap: 0px; height: fit-content; justify-content: flex-start"
+                >
+                  <div
+                    data-pencil-name="环的大小"
+                    style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 13px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    环的大小
+                  </div>
+                </div>
+                <div
+                  data-pencil-name="环的大小数值"
+                  style="align-items: center; background-color: #F7F8FA; border-radius: 6px; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: fit-content; justify-content: space-between; outline-offset: -0.5px; outline: 1px solid #E3E7EE; padding: 6px 10px; width: 100px"
+                >
+                  <div
+                    data-pencil-name="140"
+                    style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 12px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    140
+                  </div>
+                  <div
+                    data-pencil-name="⌃⌄"
+                    style='box-sizing: border-box; color: #6B7482; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 10px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    ⌃⌄
+                  </div>
+                </div>
+              </div>
+              <div
+                data-pencil-name="每个环的时长"
+                style="align-items: center; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 12px; height: fit-content; justify-content: flex-start; position: relative; width: 100%; z-index: 3"
+              >
+                <div
+                  data-pencil-name="参数名称"
+                  style="align-items: flex-start; box-sizing: border-box; display: flex; flex-direction: row; flex: 1 1 0; gap: 0px; height: fit-content; justify-content: flex-start"
+                >
+                  <div
+                    data-pencil-name="每个环的时长"
+                    style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 13px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    每个环的时长
+                  </div>
+                </div>
+                <div
+                  data-pencil-name="每个环的时长数值"
+                  style="align-items: center; background-color: #F7F8FA; border-radius: 6px; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: fit-content; justify-content: space-between; outline-offset: -0.5px; outline: 1px solid #E3E7EE; padding: 6px 10px; width: 100px"
+                >
+                  <div
+                    data-pencil-name="0.5 秒"
+                    style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 12px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    0.5 秒
+                  </div>
+                  <div
+                    data-pencil-name="⌃⌄"
+                    style='box-sizing: border-box; color: #6B7482; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 10px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    ⌃⌄
+                  </div>
+                </div>
+              </div>
+              <div
+                data-pencil-name="出环间隔"
+                style="align-items: center; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 12px; height: fit-content; justify-content: flex-start; position: relative; width: 100%; z-index: 4"
+              >
+                <div
+                  data-pencil-name="参数名称"
+                  style="align-items: flex-start; box-sizing: border-box; display: flex; flex-direction: row; flex: 1 1 0; gap: 0px; height: fit-content; justify-content: flex-start"
+                >
+                  <div
+                    data-pencil-name="出环间隔"
+                    style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 13px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    出环间隔
+                  </div>
+                </div>
+                <div
+                  data-pencil-name="出环间隔数值"
+                  style="align-items: center; background-color: #F7F8FA; border-radius: 6px; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: fit-content; justify-content: space-between; outline-offset: -0.5px; outline: 1px solid #E3E7EE; padding: 6px 10px; width: 100px"
+                >
+                  <div
+                    data-pencil-name="0.1 秒"
+                    style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 12px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    0.1 秒
+                  </div>
+                  <div
+                    data-pencil-name="⌃⌄"
+                    style='box-sizing: border-box; color: #6B7482; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 10px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    ⌃⌄
+                  </div>
+                </div>
+              </div>
+              <div
+                data-pencil-name="至少持续"
+                style="align-items: center; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 12px; height: fit-content; justify-content: flex-start; position: relative; width: 100%; z-index: 5"
+              >
+                <div
+                  data-pencil-name="参数名称"
+                  style="align-items: flex-start; box-sizing: border-box; display: flex; flex-direction: row; flex: 1 1 0; gap: 0px; height: fit-content; justify-content: flex-start"
+                >
+                  <div
+                    data-pencil-name="至少持续"
+                    style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 13px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    至少持续
+                  </div>
+                </div>
+                <div
+                  data-pencil-name="至少持续数值"
+                  style="align-items: center; background-color: #F7F8FA; border-radius: 6px; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: fit-content; justify-content: space-between; outline-offset: -0.5px; outline: 1px solid #E3E7EE; padding: 6px 10px; width: 100px"
+                >
+                  <div
+                    data-pencil-name="1 秒"
+                    style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 12px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    1 秒
+                  </div>
+                  <div
+                    data-pencil-name="⌃⌄"
+                    style='box-sizing: border-box; color: #6B7482; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 10px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    ⌃⌄
+                  </div>
+                </div>
+              </div>
+              <div
+                data-pencil-name="停下判定时间"
+                style="align-items: center; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 12px; height: fit-content; justify-content: flex-start; position: relative; width: 100%; z-index: 6"
+              >
+                <div
+                  data-pencil-name="参数名称"
+                  style="align-items: flex-start; box-sizing: border-box; display: flex; flex-direction: row; flex: 1 1 0; gap: 0px; height: fit-content; justify-content: flex-start"
+                >
+                  <div
+                    data-pencil-name="停下判定时间"
+                    style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 13px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    停下判定时间
+                  </div>
+                </div>
+                <div
+                  data-pencil-name="停下判定时间数值"
+                  style="align-items: center; background-color: #F7F8FA; border-radius: 6px; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: fit-content; justify-content: space-between; outline-offset: -0.5px; outline: 1px solid #E3E7EE; padding: 6px 10px; width: 100px"
+                >
+                  <div
+                    data-pencil-name="0.5 秒"
+                    style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 12px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    0.5 秒
+                  </div>
+                  <div
+                    data-pencil-name="⌃⌄"
+                    style='box-sizing: border-box; color: #6B7482; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 10px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    ⌃⌄
+                  </div>
+                </div>
+              </div>
+              <div
+                data-pencil-name="最长持续"
+                style="align-items: center; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 12px; height: fit-content; justify-content: flex-start; position: relative; width: 100%; z-index: 7"
+              >
+                <div
+                  data-pencil-name="参数名称"
+                  style="align-items: flex-start; box-sizing: border-box; display: flex; flex-direction: row; flex: 1 1 0; gap: 0px; height: fit-content; justify-content: flex-start"
+                >
+                  <div
+                    data-pencil-name="最长持续"
+                    style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 13px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    最长持续
+                  </div>
+                </div>
+                <div
+                  data-pencil-name="最长持续数值"
+                  style="align-items: center; background-color: #F7F8FA; border-radius: 6px; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: fit-content; justify-content: space-between; outline-offset: -0.5px; outline: 1px solid #E3E7EE; padding: 6px 10px; width: 100px"
+                >
+                  <div
+                    data-pencil-name="5 秒"
+                    style='box-sizing: border-box; color: #202632; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 12px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    5 秒
+                  </div>
+                  <div
+                    data-pencil-name="⌃⌄"
+                    style='box-sizing: border-box; color: #6B7482; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 10px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+                  >
+                    ⌃⌄
+                  </div>
+                </div>
+              </div>
+              <div
+                data-pencil-name="前景波纹 · 输入事件穿透"
+                style="box-sizing: border-box; height: 350px; left: 0px; opacity: 0.55; overflow: hidden; position: absolute; top: 0px; width: 416px; z-index: 8"
+              >
+                <div
+                  data-pencil-name="最早的环 · 扩散最大"
+                  style="border-radius: 50%; box-sizing: border-box; height: 80px; left: -16px; outline-offset: -1px; outline: 2px solid #D4E1FA; position: absolute; top: 135px; width: 80px; z-index: 0"
+                ></div>
+                <div
+                  data-pencil-name="中间的环"
+                  style="border-radius: 50%; box-sizing: border-box; height: 64px; left: 12px; outline-offset: -1px; outline: 2px solid #A7C2F4; position: absolute; top: 143px; width: 64px; z-index: 1"
+                ></div>
+                <div
+                  data-pencil-name="最新的环 · 光标处最小"
+                  style="border-radius: 50%; box-sizing: border-box; height: 44px; left: 46px; outline-offset: -1px; outline: 2px solid #6192ED; position: absolute; top: 153px; width: 44px; z-index: 2"
+                ></div>
+              </div>
+            </div>
+            <div
+              data-pencil-name="独立居中分界线 · 不与卡片重叠"
+              style="background-color: #E3E7EE; box-sizing: border-box; height: 350px; left: 417.5px; position: absolute; top: 0px; width: 1px; z-index: 2"
+            ></div>
+            <svg
+              data-pencil-name="离开光标 · 尖端对准边界圆心"
+              data-icon-name="mouse-pointer-2"
+              data-icon-set="lucide"
+              viewBox="0 0 13.99993896484375 14"
+              preserveAspectRatio="xMidYMid meet"
+              xmlns="http://www.w3.org/2000/svg"
+              style="box-sizing: border-box; height: 20px; left: 412.67px; position: absolute; top: 171.67px; width: 20px; z-index: 3"
+            >
+              <path
+                d="M2.40967 1.77734q-0.33838 0.08545-0.52637 0.39991-0.18799 0.31445-0.10596 0.64941 0.02734 0.09912 1.93116 4.79541 1.90381 4.69629 1.96191 4.78174 0.06836 0.14014 0.229 0.25293 0.16406 0.11279 0.31788 0.15381 0.08203 0.01367 0.20849 0.01367 0.12646 0 0.21192-0.02734 0.18115-0.04443 0.33496-0.16748 0.15381-0.12647 0.22216-0.29395 0.07178-0.12647 0.53321-1.94483 0.46143-1.82178 0.50244-1.90722 0.08545-0.16748 0.25293-0.25293 0.08545-0.04102 1.90381-0.50928 1.82178-0.46826 1.94824-0.52637 0.16748-0.06836 0.29053-0.22216 0.12646-0.15381 0.17089-0.33496 0.08203-0.29736-0.04443-0.56739-0.12305-0.27344-0.38965-0.41357-0.12646-0.07178-4.79541-1.96875-4.66895-1.89697-4.75439-1.91065-0.19482-0.05469-0.40332 0z m4.70312 2.98389q3.88965 1.5791 3.88965 1.58936 0 0.00684-1.3501 0.35546-1.3501 0.34863-1.44922 0.39307-0.34863 0.0957-0.6289 0.35547-0.28027 0.25977-0.43408 0.59473-0.05469 0.14014-0.42041 1.54834-0.3623 1.40478-0.37256 1.40478-0.00684 0-1.56885-3.83496-1.55859-3.83496-1.59961-3.9751-0.01367-0.02734 0.01367-0.01367l3.92041 1.58252z"
+                fill="#2869E8"
+              ></path>
+            </svg>
+            <svg
+              data-pencil-name="进入光标 · 尖端对准最新环圆心"
+              data-icon-name="mouse-pointer-2"
+              data-icon-set="lucide"
+              viewBox="0 0 13.99993896484375 14"
+              preserveAspectRatio="xMidYMid meet"
+              xmlns="http://www.w3.org/2000/svg"
+              style="box-sizing: border-box; height: 20px; left: 484.67px; position: absolute; top: 171.67px; width: 20px; z-index: 4"
+            >
+              <path
+                d="M2.40967 1.77734q-0.33838 0.08545-0.52637 0.39991-0.18799 0.31445-0.10596 0.64941 0.02734 0.09912 1.93116 4.79541 1.90381 4.69629 1.96191 4.78174 0.06836 0.14014 0.229 0.25293 0.16406 0.11279 0.31788 0.15381 0.08203 0.01367 0.20849 0.01367 0.12646 0 0.21192-0.02734 0.18115-0.04443 0.33496-0.16748 0.15381-0.12647 0.22216-0.29395 0.07178-0.12647 0.53321-1.94483 0.46143-1.82178 0.50244-1.90722 0.08545-0.16748 0.25293-0.25293 0.08545-0.04102 1.90381-0.50928 1.82178-0.46826 1.94824-0.52637 0.16748-0.06836 0.29053-0.22216 0.12646-0.15381 0.17089-0.33496 0.08203-0.29736-0.04443-0.56739-0.12305-0.27344-0.38965-0.41357-0.12646-0.07178-4.79541-1.96875-4.66895-1.89697-4.75439-1.91065-0.19482-0.05469-0.40332 0z m4.70312 2.98389q3.88965 1.5791 3.88965 1.58936 0 0.00684-1.3501 0.35546-1.3501 0.34863-1.44922 0.39307-0.34863 0.0957-0.6289 0.35547-0.28027 0.25977-0.43408 0.59473-0.05469 0.14014-0.42041 1.54834-0.3623 1.40478-0.37256 1.40478-0.00684 0-1.56885-3.83496-1.55859-3.83496-1.59961-3.9751-0.01367-0.02734 0.01367-0.01367l3.92041 1.58252z"
+                fill="#2869E8"
+              ></path>
+            </svg>
+          </div>
+          <div
+            data-pencil-name="预览简要说明"
+            style="align-items: center; box-sizing: border-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 12px; height: fit-content; justify-content: flex-start; width: 100%"
+          >
+            <div
+              data-pencil-name="预览与持续时间说明"
+              style='box-sizing: border-box; color: #6B7482; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 12px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+            >
+              从左向右移入卡片体验波纹；进入波纹至少持续 1 秒，停下 0.5 秒后停止出环，最长 5 秒。
+            </div>
+          </div>
+        </div>
+        <div
+          data-pencil-name="后台与紧急收回"
+          style="align-items: center; border-color: #E3E7EE; border-style: solid; border-width: 1px 0px 0px 0px; box-sizing: content-box; display: flex; flex-direction: row; flex-shrink: 0; gap: 0px; height: 47.5px; justify-content: space-between; margin: -0.5px 0px 0px 0px; padding: 0px 24px; width: 900px"
+        >
+          <div
+            data-pencil-name="关闭窗口后仍在后台运行 · 开机自动启动"
+            style='box-sizing: border-box; color: #6B7482; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 11px; font-style: normal; font-weight: 400; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+          >
+            关闭窗口后仍在后台运行 · 开机自动启动
+          </div>
+          <div
+            data-pencil-name="紧急收回光标  ⌃ ⌥ ⌘ L"
+            style='box-sizing: border-box; color: #6B7482; font-family: "Noto Sans SC", system-ui, sans-serif; font-size: 12px; font-style: normal; font-weight: 500; letter-spacing: 0px; line-height: normal; text-align: left; white-space: nowrap'
+          >
+            紧急收回光标 ⌃ ⌥ ⌘ L
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
