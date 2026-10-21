@@ -1,5 +1,5 @@
 #!/bin/bash
-# 一键：编译 → 打包成 MacKVM.app → 签名 → 验签 → 装到 ~/Applications
+# 一键：编译 → 打包成 MacKVM.app（程序 + Info.plist + 资源）→ 签名 → 验签 → 装到 ~/Applications
 # 如果本机的 LaunchAgent 已装载，最后顺手重启它，让新版本生效。
 #
 # 签名：默认 ad-hoc（不需要任何证书，任何人都能编译运行）。ad-hoc 签名的程序每次重新编译后，
@@ -29,6 +29,10 @@ swiftc -O -swift-version 5 -target arm64-apple-macos26.0 \
 echo "== 打包"
 cp Info.plist "$APP/Contents/Info.plist"
 plutil -lint "$APP/Contents/Info.plist"
+# 资源（程序图标等）：仓库的 Resources/ 整个拷进 Contents/Resources，程序里用 Bundle.main 加载。
+# 要在签名之前拷，两种签名都会把它们封进签名里
+mkdir -p "$APP/Contents/Resources"
+cp -R Resources/. "$APP/Contents/Resources/"
 
 if [ "$IDENTITY" = "-" ]; then
     echo "== 签名（ad-hoc；重新编译后要重新授权辅助功能）"

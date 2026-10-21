@@ -1,7 +1,7 @@
 // 本机持久化的全部状态，以及两台之间同步的共享设置：
 //   - 本机设备 ID（第一次启动时随机生成，之后不变）；
 //   - 配对记录：对方设备 ID、对方设备名、长期密钥、上次连上对方的 IPv4 地址；
-//   - 共享设置 SharedSettings：谁是主控、两台的相对位置、波纹参数，带修订号，两台按修订号取新的；
+//   - 共享设置 SharedSettings：谁是主控、屏幕布局和相邻规则、波纹参数，带修订号，两台按修订号取新的；
 //   - 待通知的解除配对：本机解除配对时对方不在线，就先记着，等对方上线再告诉它。
 // 全部写在 ~/Library/Application Support/MacKVM/state.json（目录 700、文件 600，里面有密钥）。
 // 环境变量 MACKVM_HOME 可以把目录换掉，只给自测用。
@@ -161,32 +161,37 @@ func hexColorString(_ rgb: (Double, Double, Double)) -> String {
 
 // MARK: - 共享设置（两台同步）
 
-/// 两台存的是同一份：谁是主控、屏幕相邻规则、波纹参数。规则里写的是具体哪台的哪块屏，
-/// 各自用 AdjacencyRule.view(from:) 换算成本机视角，两台不会存反；对调角色时规则不变。
+/// 两台存的是同一份：谁是主控、屏幕布局和由它推导出的相邻规则、波纹参数。规则里写的是具体哪台的哪块屏，
+/// 各自用 AdjacencyRule.view(from:) 换算成本机视角，两台不会存反；对调角色时布局和规则都不变。
+/// 布局和规则总是一起改：修改的一方从布局算出规则、一起发出去，另一方照单全收，不自己重算。
 struct SharedSettings: Codable, Equatable {
     var revision: UInt64            // 每改一次加 1；同步时取修订号大的
     var editor: String              // 最后修改者的设备 ID（修订号相同时按它比大小，两台结论一致）
     var controllerID: String        // 主控（键鼠所在那台）的设备 ID
-    var rules: [AdjacencyRule] = [] // 屏幕相邻规则
-    var rulesInitialized = false    // 默认规则生成过没有（只生成一次；之后规则删光也不补）
+    var layout: [ScreenSpot] = []   // 屏幕布局：两台每块屏在「设备连接」页上的位置（毫米）
+    var rules: [AdjacencyRule] = [] // 屏幕相邻规则（从布局推导）
+    var rulesInitialized = false    // 默认布局生成过没有（配对后只生成一次）
     var ripple: RippleConfig
 
-    init(revision: UInt64, editor: String, controllerID: String, rules: [AdjacencyRule] = [],
-         rulesInitialized: Bool = false, ripple: RippleConfig) {
+    init(revision: UInt64, editor: String, controllerID: String, layout: [ScreenSpot] = [],
+         rules: [AdjacencyRule] = [], rulesInitialized: Bool = false, ripple: RippleConfig) {
         self.revision = revision
         self.editor = editor
         self.controllerID = controllerID
+        self.layout = layout
         self.rules = rules
         self.rulesInitialized = rulesInitialized
         self.ripple = ripple
     }
 
-    // 自己写解码：旧版本的数据没有规则字段（只有已废弃的 layoutAnchor / layoutOtherIs），按「还没有规则」处理
+    // 自己写解码，兼容旧数据：没有规则字段（更早的版本只有已废弃的 layoutAnchor / layoutOtherIs）按「还没有规则」处理；
+    // 有规则、没有布局字段的，布局读成空，由 AppModel 按规则摆出布局（见 ScreenLayout.migrated）
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         revision = try c.decode(UInt64.self, forKey: .revision)
         editor = try c.decode(String.self, forKey: .editor)
         controllerID = try c.decode(String.self, forKey: .controllerID)
+        layout = try c.decodeIfPresent([ScreenSpot].self, forKey: .layout) ?? []
         rules = try c.decodeIfPresent([AdjacencyRule].self, forKey: .rules) ?? []
         rulesInitialized = try c.decodeIfPresent(Bool.self, forKey: .rulesInitialized) ?? false
         ripple = try c.decodeIfPresent(RippleConfig.self, forKey: .ripple) ?? .defaults
@@ -203,10 +208,14 @@ struct SharedSettings: Codable, Equatable {
         return ids.contains(controllerID) && ids.contains(editor)
             && rules.allSatisfy { ids.contains($0.aDevice) && ids.contains($0.bDevice) && $0.aDevice != $0.bDevice
                 && $0.offsetMM.isFinite }
+            && layout.allSatisfy { ids.contains($0.device) && $0.x.isFinite && $0.y.isFinite }
     }
 
-    /// 还要不要补生成默认规则
-    var needsDefaultRule: Bool { !rulesInitialized }
+    /// 还要不要补生成默认布局
+    var needsDefaultLayout: Bool { !rulesInitialized }
+
+    /// 旧数据：生成过默认规则（或有规则），但还没有布局
+    var needsLayoutMigration: Bool { rulesInitialized && layout.isEmpty }
 }
 
 // MARK: - 配对记录

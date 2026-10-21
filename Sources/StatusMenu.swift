@@ -14,9 +14,11 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         super.init()
         if let b = item.button {
-            let img = NSImage(systemSymbolName: "keyboard", accessibilityDescription: "MacKVM")
+            // 程序图标 24×24 点、模板图（深色菜单栏自动反白）；资源缺失时退回系统的键盘符号，菜单栏不至于空着
+            let img = AppIcon.image(points: 24) ?? NSImage(systemSymbolName: "keyboard", accessibilityDescription: "MacKVM")
             img?.isTemplate = true
             b.image = img
+            b.imageScaling = .scaleProportionallyDown
             b.toolTip = "MacKVM"
         }
         menu.delegate = self

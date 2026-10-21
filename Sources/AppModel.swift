@@ -2,8 +2,9 @@
 //   - 读写持久化状态（Settings.swift 的 Store）；
 //   - 未配对时：管「发起邀请」（PairingInviter）和「查找设备 + 输入配对码」（BonjourBrowser + PairingSeeker）；
 //   - 已配对时：起 Link 保持连接，按共享设置里的主控 ID 起主控角色或被控角色，运行中可以随时切换；
-//   - 两台之间同步共享设置（屏幕相邻规则、角色、波纹参数），处理解除配对、对调角色；
-//   - 两台互相交换屏幕清单；配对后还没有任何规则时由主控补生成一次默认规则；
+//   - 两台之间同步共享设置（屏幕布局和相邻规则、角色、波纹参数），处理解除配对、对调角色；
+//   - 两台互相交换屏幕清单；配对后由主控生成一次默认布局；旧数据只有规则时按规则摆出布局；
+//   - 用户在「设备连接」页摆放屏幕：更新布局、从布局推导相邻规则，一起同步给对方；
 //   - 给界面算连接状态：已连接 / 正在寻找对方 / 对方不在线。
 // 所有方法都只在主线程调用（网络回调都排在主队列上）。
 
@@ -33,8 +34,6 @@ enum Dialog: Equatable {
     case linkInfo                       // 08 点击连接状态标签才弹出的说明（状态变化时绝不自动弹）
     case confirmUnpair                  // 解除配对确认
     case confirmSwap                    // 切换输入设备（对调角色）确认
-    case addRule                        // 06A 添加相邻规则
-    case confirmDeleteLastRule          // 删除最后一条规则前确认
 }
 
 /// 连上之后互相告知的本机信息
@@ -56,7 +55,7 @@ final class AppModel: ObservableObject {
     @Published var linkStatus: LinkStatus = .searching
     @Published var tab: MainTab = .connection
     @Published var dialog: Dialog?
-    /// 加 1 = 让界面把弹窗以外的临时交互状态（预览拖动中、规则列表弹出框）复位；主窗口重新成为 key、应用重新激活时由 MainWindowController 触发
+    /// 加 1 = 让界面把弹窗以外的临时交互状态（预览里拖动中的屏）复位；主窗口重新成为 key、应用重新激活时由 MainWindowController 触发
     @Published var interactionResetToken = 0
     // 发起邀请
     @Published var inviteCode = ""
@@ -74,17 +73,15 @@ final class AppModel: ObservableObject {
     /// 07 页卡片预览（两张卡片模拟两块并排屏幕）的状态
     let ripplePreview = RipplePreviewModel()
 
-    // 屏幕与相邻规则
+    // 屏幕、布局与相邻规则
     @Published var localScreens: [ScreenInfo] = [] { didSet { cachedMap = nil } }
     @Published var peerScreens: [ScreenInfo] = [] { didSet { cachedMap = nil } }
     /// 这次连接里已经收到过对方的屏幕清单（否则界面上用的是上次缓存的）
     @Published var peerScreensFresh = false
-    /// 两台见过的所有屏幕（按 ID）：规则用到的屏拔掉了，界面上还能显示它的名字和尺寸
+    /// 两台见过的所有屏幕（按 ID）：布局里的屏拔掉了，界面上还能显示它的名字和尺寸
     @Published var knownScreens: [String: ScreenInfo] = [:]
-    /// 只给离屏自查用：非 nil 时 06 页预览按「正拖到这个位置」显示（含拖动处的说明）
-    @Published var previewDragOverride: RuleView?
-    /// 06 页当前选中的规则
-    @Published var selectedRuleID: String?
+    /// 只给离屏自查用：非 nil 时 06 页预览按「这块屏正被拖到这个位置」显示
+    @Published var previewDragOverride: ScreenSpot?
     private var cachedMap: CrossingMap?
     private var peerSettingsSeen = false
     private var screenObserver: NSObjectProtocol?
@@ -146,6 +143,7 @@ final class AppModel: ObservableObject {
     var isController: Bool { shared?.controllerID == me.id }
     var peerName: String { pairing?.peerName ?? "" }
     var rules: [AdjacencyRule] { shared?.rules ?? [] }
+    var peerID: String { pairing?.peerID ?? "" }
 
     /// 当前生效的相邻规则（本机视角）和两台屏幕信息；跨屏判定每个鼠标事件都要用，所以缓存起来
     var crossingMap: CrossingMap {
@@ -156,9 +154,16 @@ final class AppModel: ObservableObject {
         return m
     }
 
-    /// 两台全部屏幕（按 ID 索引），约束校验用
-    var allScreens: [String: ScreenInfo] {
-        Dictionary((localScreens + peerScreens).map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+    /// 某台的某块屏的信息：现在接着的优先，其次是见过的（拔掉的屏）
+    func screenInfo(device: String, screen: String) -> ScreenInfo? {
+        let list = device == me.id ? localScreens : (device == peerID ? peerScreens : [])
+        return list.first { $0.id == screen } ?? knownScreens[screen]
+    }
+
+    /// 界面上摆出来的布局：共享设置里的布局，加上现在接着、布局里还没有的屏（放在最右边）
+    var placedScreens: [PlacedScreen] {
+        let present = localScreens.map { (device: me.id, info: $0) } + peerScreens.map { (device: peerID, info: $0) }
+        return ScreenLayout.placed(spots: shared?.layout ?? [], present: present, info: screenInfo)
     }
     var ripple: RippleConfig { shared?.ripple ?? localRipple }
 
@@ -206,7 +211,7 @@ final class AppModel: ObservableObject {
     private func startPaired() {
         guard let rec = pairing, let key = rec.key, let s = shared else { return }
         logRole = isController ? "主控" : "被控"
-        log("已配对「\(rec.peerName)」：本机是\(isController ? "主控（键鼠接在本机）" : "被控（被对方操作）")，相邻规则 \(s.rules.count) 条\(s.rulesInitialized ? "" : "（还没生成过默认规则）")，共享设置修订号 \(s.revision)")
+        log("已配对「\(rec.peerName)」：本机是\(isController ? "主控（键鼠接在本机）" : "被控（被对方操作）")，屏幕布局 \(s.layout.count) 块屏、相邻规则 \(s.rules.count) 条\(s.rulesInitialized ? "" : "（还没生成过默认布局）")，共享设置修订号 \(s.revision)")
         let l = Link(me: me, peerID: rec.peerID, key: key, lastAddress: rec.lastAddress)
         l.onAuthenticated = { [weak self] p in self?.linkUp(p) }
         l.onMessage = { [weak self] _, t, d in self?.linkMessage(t, d) }
@@ -222,6 +227,7 @@ final class AppModel: ObservableObject {
         linkStatus = .searching
         l.start()
         startRole()
+        maybeMigrateLayout()
     }
 
     private func startRole() {
@@ -278,7 +284,8 @@ final class AppModel: ObservableObject {
         case .settings:
             receiveSettings(d)
             peerSettingsSeen = true
-            maybeCreateDefaultRule()
+            maybeCreateDefaultLayout()
+            maybeMigrateLayout()
         case .screens:
             guard let list = try? JSONDecoder().decode([ScreenInfo].self, from: d) else {
                 log("警告：对方发来的屏幕清单解析失败")
@@ -291,7 +298,8 @@ final class AppModel: ObservableObject {
             state.peerScreens = list
             persist()
             if changed { log("对方屏幕：\(describeScreens(list))") }
-            maybeCreateDefaultRule()
+            maybeCreateDefaultLayout()
+            maybeMigrateLayout()
         case .unpair:
             log("对方解除了配对，本机也清除配对")
             clearPairing(reason: "对方解除了配对")
@@ -343,17 +351,14 @@ final class AppModel: ObservableObject {
     /// 生效一份共享设置：保存、更新波纹参数；角色变了就就地切换主控/被控逻辑（不重启进程）
     private func applyShared(_ s: SharedSettings) {
         let wasController = isController
-        let oldRules = rules
+        let old = shared
         shared = s
         cachedMap = nil
         localRipple = s.ripple
         rippleConfig = s.ripple
         persist()
-        if s.rules != oldRules {
-            log("相邻规则：\(s.rules.count) 条，\(crossingMap.activeViews.count) 条生效")
-            if selectedRuleID == nil || !s.rules.contains(where: { $0.id == selectedRuleID }) {
-                selectedRuleID = s.rules.first?.id
-            }
+        if s.layout != old?.layout || s.rules != old?.rules {
+            log("屏幕布局 \(s.layout.count) 块屏；相邻规则 \(s.rules.count) 条，\(crossingMap.activeViews.count) 条生效")
         }
         if wasController != isController {
             log("角色切换：本机现在是\(isController ? "主控（键鼠接在本机）" : "被控（被对方操作）")")
@@ -397,6 +402,7 @@ final class AppModel: ObservableObject {
         remember(list)
         if doLog { log("本机屏幕：\(describeScreens(list))") }
         sendScreens()
+        maybeMigrateLayout()
     }
 
     private func remember(_ list: [ScreenInfo]) {
@@ -410,64 +416,56 @@ final class AppModel: ObservableObject {
         p.send(.screens, d)
     }
 
-    /// 配对后还没生成过规则：由主控（拿到双方屏幕清单、并且收到过对方的共享设置之后）补生成一次默认规则
-    private func maybeCreateDefaultRule() {
-        guard let s = shared, s.needsDefaultRule, isController, let rec = pairing, link?.active != nil,
+    private func newRuleID() -> String { UUID().uuidString.lowercased() }
+
+    /// 配对后还没生成过默认布局：由主控（拿到双方屏幕清单、并且收到过对方的共享设置之后）生成一次，
+    /// 再从布局推导规则（效果是「主控最右侧屏的右边 ↔ 被控最左侧屏的左边，中点对齐」）
+    private func maybeCreateDefaultLayout() {
+        guard let s = shared, s.needsDefaultLayout, isController, let rec = pairing, link?.active != nil,
               peerSettingsSeen, peerScreensFresh, !localScreens.isEmpty, !peerScreens.isEmpty else { return }
-        let rule = DefaultRule.make(controller: me.id, controllerScreens: localScreens, controlled: rec.peerID,
-                                    controlledScreens: peerScreens, id: UUID().uuidString.lowercased())
+        let layout = ScreenLayout.defaultLayout(controller: me.id, controllerScreens: localScreens,
+                                                controlled: rec.peerID, controlledScreens: peerScreens)
+        let placed = ScreenLayout.placed(spots: layout, present: [], info: screenInfo)
+        let rules = ScreenLayout.rules(from: placed, me: me.id, peer: rec.peerID, existing: s.rules, newID: newRuleID)
+        log("生成默认屏幕布局：\(layout.count) 块屏，相邻规则 \(rules.count) 条")
         editShared {
-            if let rule, $0.rules.isEmpty { $0.rules.append(rule) }
+            $0.layout = layout
+            $0.rules = rules
             $0.rulesInitialized = true
         }
-        if let rule {
-            let names = ScreenNaming.labels(localScreens).merging(ScreenNaming.labels(peerScreens)) { a, _ in a }
-            log("已补生成默认相邻规则：本机「\(names[rule.aScreen] ?? rule.aScreen)」右边 ↔ 对方「\(names[rule.bScreen] ?? rule.bScreen)」左边，中点对齐（错开 \(fmt(rule.offsetMM)) 毫米）")
-        } else {
-            log("想补生成默认相邻规则，但有一台没有屏幕信息，跳过")
-        }
-        selectedRuleID = rules.first?.id
     }
 
-    /// 添加一条规则（本机一块屏 + 对方一块屏），放在第一条能用的边上，中点对齐。失败时返回原因
-    func addRule(localScreen: String, remoteScreen: String) -> String? {
-        guard let rec = pairing, let l = localScreens.first(where: { $0.id == localScreen }),
-              let r = peerScreens.first(where: { $0.id == remoteScreen }) else { return "找不到这块显示器" }
-        if rules.contains(where: { Set([$0.aScreen, $0.bScreen]) == Set([localScreen, remoteScreen]) }) {
-            return "已有这条规则"
-        }
-        guard let rule = NewRulePlacement.make(id: UUID().uuidString.lowercased(), me: me.id, peer: rec.peerID,
-                                               local: l, remote: r, existing: rules, screens: allScreens) else {
-            return "这两块屏的四条边都已被别的规则占满，放不下新规则"
-        }
-        log("用户添加相邻规则：本机「\(l.name)」\(rule.aEdge.edgeLabel) ↔ 对方「\(r.name)」")
-        editShared { $0.rules.append(rule) }
-        selectedRuleID = rule.id
-        return nil
-    }
-
-    /// 在预览里拖动后放下：按本机视角改这条规则（调用前界面已校验过）
-    func updateRule(_ id: String, view v: RuleView) {
-        guard let old = rules.first(where: { $0.id == id }) else { return }
-        let new = old.updated(with: v, me: me.id)
-        guard new != old else { return }
-        log("用户调整相邻规则 \(id.prefix(8))：本机屏\(v.localEdge.edgeLabel)，错开 \(fmt(v.offsetMM)) 毫米")
-        editShared { s in
-            if let i = s.rules.firstIndex(where: { $0.id == id }) { s.rules[i] = new }
+    /// 旧数据只有规则、没有布局：按规则把屏摆出来（见 ScreenLayout.migrated），再从布局重新推导规则。
+    /// 两台都可能各做一次，修订号同步机制会让两台收敛到同一份
+    private func maybeMigrateLayout() {
+        guard let s = shared, s.needsLayoutMigration, let rec = pairing,
+              !localScreens.isEmpty, !peerScreens.isEmpty else { return }
+        let layout = ScreenLayout.migrated(rules: s.rules, me: me.id, localScreens: localScreens, peer: rec.peerID,
+                                           peerScreens: peerScreens, info: screenInfo)
+        let placed = ScreenLayout.placed(spots: layout, present: [], info: screenInfo)
+        let rules = ScreenLayout.rules(from: placed, me: me.id, peer: rec.peerID, existing: s.rules, newID: newRuleID)
+        log("按已有的 \(s.rules.count) 条相邻规则摆出屏幕布局：\(layout.count) 块屏，重新推导出相邻规则 \(rules.count) 条")
+        editShared {
+            $0.layout = layout
+            $0.rules = rules
         }
     }
 
-    func requestDeleteRule() {
-        guard let id = selectedRuleID else { return }
-        if rules.count <= 1 { dialog = .confirmDeleteLastRule } else { deleteRule(id) }
-    }
-
-    func deleteRule(_ id: String) {
-        if dialog == .confirmDeleteLastRule { dialog = nil }
-        guard rules.contains(where: { $0.id == id }) else { return }
-        log("用户删除相邻规则 \(id.prefix(8))")
-        editShared { s in s.rules.removeAll { $0.id == id } }
-        selectedRuleID = rules.first?.id
+    /// 在预览里把一块屏拖到新位置放下（调用前界面已确认不和别的屏叠在一起）：
+    /// 整份布局（含补上的新屏）写进共享设置，同时从布局推导规则，一起同步给对方
+    func moveScreen(device: String, screen: String, to p: CGPoint) {
+        guard let rec = pairing, shared != nil else { return }
+        var placed = placedScreens
+        guard let i = placed.firstIndex(where: { $0.isSame(device, screen) }),
+              placed[i].x != p.x || placed[i].y != p.y else { return }
+        placed[i].x = p.x
+        placed[i].y = p.y
+        let rules = ScreenLayout.rules(from: placed, me: me.id, peer: rec.peerID, existing: self.rules, newID: newRuleID)
+        log("用户摆放屏幕：\(device == me.id ? "本机" : "对方")「\(placed[i].info.name)」移到 (\(Int(p.x)), \(Int(p.y))) 毫米，相邻规则 \(rules.count) 条")
+        editShared {
+            $0.layout = placed.map(\.spot)
+            $0.rules = rules
+        }
     }
 
     func confirmSwap() {
@@ -536,12 +534,11 @@ final class AppModel: ObservableObject {
         shared = nil
         peerScreens = []
         state.peerScreens = nil
-        selectedRuleID = nil
         persist()
         logRole = "未配对"
         log("已解除配对（\(reason)）。未配对，等待用户在界面上配对")
         tab = .connection
-        if [.confirmSwap, .confirmUnpair, .pairSuccess, .linkInfo, .addRule, .confirmDeleteLastRule].contains(dialog) {
+        if [.confirmSwap, .confirmUnpair, .pairSuccess, .linkInfo].contains(dialog) {
             dialog = nil
         }
         linkStatus = .searching

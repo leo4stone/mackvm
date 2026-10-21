@@ -8,7 +8,7 @@
 import AppKit
 import Foundation
 
-let kVersion = "15.8"
+let kVersion = "16.0"
 let kBundleID = "io.github.leo4stone.mackvm"
 let kAgentLabel = "io.github.leo4stone.mackvm"
 let kLogPath = NSHomeDirectory() + "/Library/Logs/MacKVM.log"

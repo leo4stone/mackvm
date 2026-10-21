@@ -209,7 +209,7 @@ struct PairSuccessDialog: View {
         let done = { model.dialog = nil; model.tab = .connection }
         StateDialog(title: "配对成功",
                     message: model.isController
-                        ? "已与「\(model.peerName)」配对。\n本机操作对方，从相邻规则的蓝色边段推出光标即可切过去。"
+                        ? "已与「\(model.peerName)」配对。\n本机操作对方，从蓝色相接边段推出光标即可切过去。"
                         : "已与「\(model.peerName)」配对。\n本机由对方操作，局域网广播已停止。",
                     onClose: done) {
             Button("完成，查看设备连接", action: done).buttonStyle(DialogButton(size: 13, padH: 16))

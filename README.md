@@ -12,7 +12,7 @@ Accessibility permission, pair from the menu bar, done. Comments and logs are in
 ## 它做什么
 
 - 一台当主控（键鼠接在它上面），另一台被控。角色可以在界面上对调。
-- 两台之间的显示器两两设置「相邻规则」：本机哪块屏的哪条边挨着对方哪块屏的哪条边，沿边可以错开。
+- 在「设备连接」页把两台的显示器摆在一起：本机的屏和对方的屏挨着的那一段边，光标就能双向跨过去，拖开就跨不过去。
   按物理尺寸（毫米）对应，和分辨率、缩放无关。每台可以接任意多块显示器。
 - 光标跨过去时，离开的一侧和到达的一侧各出一圈波纹提示，样式可调，两台同步。
 - 局域网内用 8 位配对码配对，之后自动发现、自动重连。
@@ -43,7 +43,7 @@ cd mackvm
 1. 系统设置 → 隐私与安全性 → 辅助功能，打开 MacKVM。第一次启动时会有提示；授权后程序自己继续。
 2. 第一次访问局域网时系统会弹「允许查找本地网络设备」，选允许。
 3. 点菜单栏图标打开主界面。一台点「邀请」拿到 8 位配对码，另一台点「加入」输入这个码。
-4. 配对完成会自动生成一条默认相邻规则（主控最右侧屏的右边 ↔ 被控最左侧屏的左边）。在「设备连接」页拖动调整，或添加别的规则。
+4. 配对完成会自动摆好一个默认布局（被控的屏放在主控最右侧屏的右边、中点对齐）。在「设备连接」页拖动屏幕调整。
 
 如果在辅助功能列表里用「+」加 MacKVM 加不进去（通常发生在换过程序标识、或 MacKVM.app 换过位置之后），
 是启动服务数据库里的旧记录在作怪，重新登记一次再启动即可，不用重启电脑：
@@ -86,17 +86,19 @@ launchctl kickstart -k gui/$(id -u)/io.github.leo4stone.mackvm
 ```
 Sources/
   main.swift            启动、单实例、LaunchAgent 判断
-  AppModel.swift        总调度：配对、连接、角色、规则、设置同步
+  AppModel.swift        总调度：配对、连接、角色、布局与规则、设置同步
   ControllerRole.swift  主控：截获键鼠、跨屏判定、隐藏光标、转发
   ControlledRole.swift  被控：注入事件、离开判定
   CursorHider.swift     被控方光标显隐
-  Adjacency.swift       相邻规则的几何（纯逻辑，有自测）
+  Adjacency.swift       相邻规则的几何、跨屏判定（纯逻辑，有自测）
+  Layout.swift          屏幕布局：摆放、吸附、从布局推导相邻规则、默认布局、旧数据迁移（纯逻辑，有自测）
   Screens.swift         本机显示器清单、可用区域
   Pairing.swift         配对协议
   Link.swift / Peer.swift / Discovery.swift   连接、加密帧、Bonjour
   Ripple.swift / RipplePreview.swift          波纹效果
   Settings.swift        状态文件
   UI/                   SwiftUI 界面
+Resources/              打进 MacKVM.app/Contents/Resources 的资源（程序图标）
 Verify/
   verify.sh             自测 + 离屏渲染（不进产物）
 design/                 界面设计稿导出图和需求文档

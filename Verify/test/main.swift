@@ -1,5 +1,5 @@
 // 只在构建验证时用的命令行自测入口（不打进 MacKVM.app）。由 Verify/verify.sh 编译运行。
-//   unit                         纯逻辑断言：四方向边缘映射、配对密码学、共享设置视角换算、波纹参数夹取
+//   unit                         纯逻辑断言：屏幕布局 → 相邻规则、跨屏判定、配对密码学、共享设置视角换算、波纹参数夹取
 //   loopback                     单进程内走一遍：配对（含输错 5 次换码）→ 两个 Link 用配对出的密钥连上、收发、断线重连
 //   bonjour                      用测试专用的服务类型试 Bonjour 广播与发现（需要本地网络权限，可能被拒）
 //   proc-inviter <输出文件>       两进程测试的被控方：开配对监听，把端口和配对码写进文件，配对后用 Link 回显
@@ -56,19 +56,41 @@ func unitTests() {
     check(approx(P.mmToPt(88.9, .down), 2560 + 88.9 / 507 * 1920), "P2319H 下边从它自己的左端（x=2560）起算")
     check(U.inches == 27 && P.inches == 23 && B.inches == 14, "对角线英寸：27 / 23 / 14")
 
-    print("== 默认规则")
-    let def = DefaultRule.make(controller: studio, controllerScreens: [U, P], controlled: book, controlledScreens: [B], id: "r-def")!
+    print("== 默认布局")
+    func info(_ d: String, _ id: String) -> ScreenInfo? { all[id] }
+    func placedOf(_ spots: [ScreenSpot]) -> [PlacedScreen] { ScreenLayout.placed(spots: spots, present: [], info: info) }
+    func spot(_ l: [ScreenSpot], _ d: String, _ id: String) -> ScreenSpot? { l.first { $0.device == d && $0.screen == id } }
+    let defLayout = ScreenLayout.defaultLayout(controller: studio, controllerScreens: [U, P], controlled: book, controlledScreens: [B])
+    check(spot(defLayout, studio, "U2720QM").map { $0.x == 0 && $0.y == 0 } == true
+          && spot(defLayout, studio, "P2319H").map { approx($0.x, 599) && $0.y == 0 } == true,
+          "主控的屏按 macOS 排列换算成毫米：U2720QM 在 (0, 0)，P2319H 贴着它的右边、顶部对齐")
+    check(spot(defLayout, book, "BUILTIN").map { approx($0.x, 599 + 507) && approx($0.y, (288 - 195) / 2) } == true,
+          "被控的内建屏贴着 P2319H 的右边、中点对齐")
+    let defRules = ScreenLayout.rules(from: placedOf(defLayout), me: studio, peer: book, existing: [], newID: { "r-def" })
+    check(defRules.count == 1, "默认布局推导出 1 条规则（自家两块 DELL 挨着不算）")
+    let def = defRules[0]
     check(def.aScreen == "P2319H" && def.aEdge == .right && def.bScreen == "BUILTIN" && def.bEdge == .left,
           "主控最右侧屏 P2319H 的右边 ↔ 被控最左侧屏（内建屏）的左边")
     check(approx(def.offsetMM, (288 - 195) / 2), "中点对齐：错开 46.5 毫米")
+    let defFromBook = ScreenLayout.rules(from: placedOf(defLayout), me: book, peer: studio, existing: [], newID: { "r-def" })
+    check(defFromBook.count == 1 && defFromBook[0].view(from: studio) == def.view(from: studio)
+          && defFromBook[0].view(from: book) == def.view(from: book),
+          "两台各自从同一份布局推导：换算成任一台的视角都一样")
     // 并列：两块屏右边缘一样靠右（上下叠放）→ 取主屏；主屏不在其中 → 取最上面
     let S1 = ScreenInfo(id: "S1", name: "上", isMain: false, isBuiltin: false, x: 0, y: -1080, w: 1920, h: 1080, mmW: 500, mmH: 280, estimated: false)
     let S2 = ScreenInfo(id: "S2", name: "下", isMain: true, isBuiltin: false, x: 0, y: 0, w: 1920, h: 1080, mmW: 500, mmH: 280, estimated: false)
-    check(DefaultRule.outermost([S1, S2], .right)?.id == "S2", "右边缘并列时取主屏")
+    check(ScreenLayout.outermost([S1, S2], .right)?.id == "S2", "右边缘并列时取主屏")
     var S2b = S2; S2b.isMain = false
     let S3 = ScreenInfo(id: "S3", name: "左", isMain: true, isBuiltin: false, x: -1920, y: 0, w: 1920, h: 1080, mmW: 500, mmH: 280, estimated: false)
-    check(DefaultRule.outermost([S1, S2b, S3], .right)?.id == "S1", "右边缘并列、主屏不在其中 → 取最上面那块")
-    check(DefaultRule.outermost([S1, S2b, S3], .left)?.id == "S3", "最左侧屏")
+    check(ScreenLayout.outermost([S1, S2b, S3], .right)?.id == "S1", "右边缘并列、主屏不在其中 → 取最上面那块")
+    check(ScreenLayout.outermost([S1, S2b, S3], .left)?.id == "S3", "最左侧屏")
+    let stack = ScreenLayout.arranged([S1, S2])
+    check(stack["S2"] == .zero && stack["S1"].map { $0.x == 0 && approx($0.y, -280) } == true, "上下叠放的两块屏：上面那块贴着主屏的上边")
+    // 点密度不同：第三块屏在点坐标里贴着第二块的右边，换成毫米也贴着第二块（不会和它叠在一起）
+    let Q = ScreenInfo(id: "Q", name: "第三块", isMain: false, isBuiltin: false, x: 4480, y: 0, w: 1920, h: 1080,
+                       mmW: 527, mmH: 296, estimated: false)
+    let three = ScreenLayout.arranged([U, P, Q])
+    check(three["Q"].map { approx($0.x, 599 + 507) && $0.y == 0 } == true, "三块一排：第三块贴着 P2319H 的右边（按毫米接上，不按点）")
 
     print("== 规则视角换算")
     let vS = def.view(from: studio)!, vB = def.view(from: book)!
@@ -117,9 +139,6 @@ func unitTests() {
     let vU = rU.view(from: studio)!
     let tU = vU.touch(U, B)
     check(approx(tU.lo, 200) && approx(tU.hi, 340), "挨着的一段：U2720QM 右边 200~340 毫米")
-    check(RuleCheck.problems(rU, others: [], screens: all).isEmpty, "这条规则合法（140 毫米 ≥ 10）")
-    check(RuleCheck.warnings(rU, screensByDevice: [studio: [U, P], book: [B]]) == [.coversOwnShared("U2720QM")],
-          "提醒：盖住了 U2720QM 通往自家 P2319H 的一段（200~255 毫米），只提醒不阻止")
     let mapU = CrossingMap(views: [vU], localScreens: [U, P], remoteScreens: [B])
     let yShared = U.mmToPt(236, .right)   // 1000 点：在自家相通段里，也在规则段里
     let hs = mapU.hit(from: CGPoint(x: 2559, y: yShared), to: CGPoint(x: 2561, y: yShared))
@@ -148,8 +167,6 @@ func unitTests() {
                            bScreen: "BUILTIN", offsetMM: 599 - 150)          // B 上边 0~150 毫米挨着 U 下边 449~599
     let r2 = AdjacencyRule(id: "r2", aDevice: studio, aScreen: "P2319H", aEdge: .down, bDevice: book,
                            bScreen: "BUILTIN", offsetMM: -150)               // B 上边 150~301 毫米挨着 P 下边 0~151
-    check(RuleCheck.problems(r1, others: [r2], screens: all).isEmpty && RuleCheck.problems(r2, others: [r1], screens: all).isEmpty,
-          "两条规则在内建屏上边首尾相接、不重叠：都合法")
     let mapD = CrossingMap(views: [r1.view(from: studio)!, r2.view(from: studio)!], localScreens: [U, P], remoteScreens: [B])
     let hd = mapD.hit(from: CGPoint(x: 2400, y: 1439), to: CGPoint(x: 2400, y: 1440))
     check(hd?.ruleID == "r1" && hd.map { approx($0.remoteMM, 2400.0 / 2560 * 599 - 449, 0.01) } == true,
@@ -189,42 +206,125 @@ func unitTests() {
     let hu2 = mapBD.hit(from: CGPoint(x: 300, y: 0), to: CGPoint(x: 300, y: -1))
     check(hu2?.ruleID == "r1" && hu2?.remoteScreen == "U2720QM", "内建屏上边 x=300（左段）推上 → U2720QM")
 
-    print("== 约束校验")
-    var r2o = r2; r2o.offsetMM = -140                                       // B 上边 140~301 和 r1 的 0~150 重叠
-    check(RuleCheck.problems(r2o, others: [r1], screens: all) == [.overlap("r1")], "同一条边上段落重叠：不能放，并指出和 r1 重叠")
-    var rShort = r1; rShort.offsetMM = 599 - 6                              // 只挨着 6 毫米
-    if case .tooShort(let mm)? = RuleCheck.problems(rShort, others: [], screens: all).first {
-        check(approx(mm, 6), "挨着 6 毫米：少于 10 毫米，不能放")
-    } else { check(false, "挨着 6 毫米应该报太短") }
-    var rTen = r1; rTen.offsetMM = 599 - 10
-    check(RuleCheck.problems(rTen, others: [], screens: all).isEmpty, "挨着正好 10 毫米：可以")
-    var dup = def; dup.id = "r-dup"; dup.aEdge = .down
-    check(RuleCheck.problems(dup, others: [def], screens: all).contains(.duplicatePair), "同样两块屏再加一条：已有这条规则")
+    print("== 显示器拔出")
     var gone = def; gone.bScreen = "UNPLUGGED"
-    check(RuleCheck.problems(gone, others: [], screens: all).contains(.missingScreen), "有一块屏不在：标明")
     let mapGone = CrossingMap(views: [gone.view(from: studio)!], localScreens: [U, P], remoteScreens: [B])
     check(mapGone.activeViews.isEmpty && mapGone.hit(from: CGPoint(x: 4479, y: 540), to: CGPoint(x: 4480, y: 540)) == nil,
           "显示器拔出：规则暂时失效、不跨（规则本身保留）")
-    let newR0 = NewRulePlacement.make(id: "r-new", me: studio, peer: book, local: U, remote: B, existing: [], screens: all)
-    check(newR0?.aEdge == .right && newR0.map { approx($0.offsetMM, (340 - 195) / 2) } == true,
-          "新规则（U2720QM + 内建屏，没有别的规则）：右边，中点对齐")
-    // 对方有第二块屏 B2；已有规则把对方的内建屏放在 P2319H 下方 → 新规则（U2720QM + B2）优先也放下边
+
+    print("== 布局 → 规则 → 挨着的段落，和几何一致")
+    // 本机 U2720QM 在 (0, 0)、P2319H 在 (599, 0)；内建屏摆在它们四周各处（含一部分悬空），推导出的规则算出的挨着段落，
+    // 要等于两块屏在布局里实际重合的那一段；跨屏判定从这一段中点推出去，落点也要正好是布局里同一个位置
+    let localAt: [String: CGPoint] = ["U2720QM": .zero, "P2319H": CGPoint(x: 599, y: 0)]
+    func layoutWith(_ b: CGPoint, _ extra: [ScreenSpot] = []) -> [ScreenSpot] {
+        [ScreenSpot(device: studio, screen: "U2720QM", x: 0, y: 0), ScreenSpot(device: studio, screen: "P2319H", x: 599, y: 0),
+         ScreenSpot(device: book, screen: "BUILTIN", x: b.x, y: b.y)] + extra
+    }
+    func pushOut(_ s: ScreenInfo, _ e: Direction, _ along: Double) -> (CGPoint, CGPoint) {
+        switch e {
+        case .right: return (CGPoint(x: s.x + s.w - 3, y: along), CGPoint(x: s.x + s.w + 1, y: along))
+        case .left: return (CGPoint(x: s.x + 2, y: along), CGPoint(x: s.x - 2, y: along))
+        case .down: return (CGPoint(x: along, y: s.y + s.h - 3), CGPoint(x: along, y: s.y + s.h + 1))
+        case .up: return (CGPoint(x: along, y: s.y + 2), CGPoint(x: along, y: s.y - 2))
+        }
+    }
+    let geoCases: [(String, CGPoint, String, Direction, Double, Double)] = [
+        // 说明、内建屏左上角、应挨着的本机屏、本机屏的边、重合段在布局里的起止（沿边方向的绝对坐标）
+        ("P2319H 右边、中点对齐", CGPoint(x: 1106, y: 46.5), "P2319H", .right, 46.5, 241.5),
+        ("P2319H 右边、上半截悬空", CGPoint(x: 1106, y: -100), "P2319H", .right, 0, 95),
+        ("P2319H 右边、下半截悬空", CGPoint(x: 1106, y: 200), "P2319H", .right, 200, 288),
+        ("P2319H 下边", CGPoint(x: 700, y: 288), "P2319H", .down, 700, 1001),
+        ("U2720QM 下边、右端伸到 P2319H 下方之外", CGPoint(x: 300, y: 340), "U2720QM", .down, 300, 599),
+        ("P2319H 上边", CGPoint(x: 800, y: -195), "P2319H", .up, 800, 1101),
+        ("U2720QM 左边", CGPoint(x: -301, y: 100), "U2720QM", .left, 100, 295),
+        ("U2720QM 上边、左半截悬空", CGPoint(x: -100, y: -195), "U2720QM", .up, 0, 201),
+    ]
+    for (what, bAt, lid, edge, lo, hi) in geoCases {
+        let rs = ScreenLayout.rules(from: placedOf(layoutWith(bAt)), me: studio, peer: book, existing: [], newID: { "r-geo" })
+        guard rs.count == 1, let v = rs[0].view(from: studio), let vb = rs[0].view(from: book), let l = all[lid] else {
+            check(false, "\(what)：应该正好推导出 1 条规则（实际 \(rs.count) 条）")
+            continue
+        }
+        let ls = localAt[lid]!
+        let lStart = edge.isVertical ? ls.x : ls.y, bStart = edge.isVertical ? bAt.x : bAt.y
+        let t = v.touch(l, B), tb = vb.touch(B, l)
+        check(v.localScreen == lid && v.localEdge == edge && approx(t.lo, lo - lStart) && approx(t.hi, hi - lStart)
+              && vb.localEdge == edge.opposite && approx(tb.lo, lo - bStart) && approx(tb.hi, hi - bStart),
+              "\(what)：本机边上 \(fmt(t.lo))~\(fmt(t.hi)) 毫米、内建屏边上 \(fmt(tb.lo))~\(fmt(tb.hi)) 毫米，和布局里的重合段一致")
+        let mid = (lo + hi) / 2
+        let (p0, p1) = pushOut(l, edge, l.mmToPt(mid - lStart, edge))
+        let h = CrossingMap(views: [v], localScreens: [U, P], remoteScreens: [B]).hit(from: p0, to: p1)
+        check(h.map { approx($0.remoteMM, mid - bStart, 0.05) && $0.remoteEdge == edge.opposite } == true,
+              "\(what)：从重合段中点推出，落在内建屏边上 \(fmt(mid - bStart)) 毫米（布局里同一个位置）")
+    }
+
+    print("== 布局 → 规则：挨上才有、拖开即删、ID 沿用")
+    func derive(_ spots: [ScreenSpot], existing: [AdjacencyRule] = []) -> [AdjacencyRule] {
+        var n = 0
+        return ScreenLayout.rules(from: placedOf(spots), me: studio, peer: book, existing: existing, newID: { n += 1; return "r-new-\(n)" })
+    }
+    check(derive(layoutWith(CGPoint(x: 1106 + 50, y: 46.5))).isEmpty, "内建屏拖开 50 毫米：没有规则（光标跨不过去）")
+    check(derive(layoutWith(CGPoint(x: 1106, y: 288 - 8))).isEmpty, "只挨着 8 毫米：不到 10 毫米，不算")
+    check(derive(layoutWith(CGPoint(x: 1106, y: 288 - 10))).count == 1, "挨着正好 10 毫米：算")
+    check(derive(layoutWith(CGPoint(x: 1106 + 0.3, y: 46.5))).count == 1, "差 0.3 毫米（小数误差）：算挨着")
+    check(derive(layoutWith(CGPoint(x: 1106, y: 288))).isEmpty, "只碰到一个角：不算")
+    let kept = derive(layoutWith(CGPoint(x: 1106, y: 0)), existing: [def])
+    check(kept.count == 1 && kept[0].id == "r-def" && approx(kept[0].offsetMM, 0), "同一对屏已有规则：沿用它的 ID，错开改成 0")
+    var flipped = AdjacencyRule(id: "r-flip", aDevice: book, aScreen: "BUILTIN", aEdge: .left, bDevice: studio, bScreen: "P2319H", offsetMM: -46.5)
+    let keptFlip = derive(layoutWith(CGPoint(x: 700, y: 288)), existing: [flipped])
+    flipped.aEdge = .up; flipped.offsetMM = -101
+    check(keptFlip == [flipped], "已有规则的甲方是对方：沿用 ID 和甲乙方向，只改边和错开（对方视角：内建屏上边，错开 -101）")
     let B2 = ScreenInfo(id: "B2", name: "外接屏", isMain: false, isBuiltin: false, x: 1512, y: 0, w: 1920, h: 1080,
                         mmW: 527, mmH: 296, estimated: false)
     var all2 = all; all2[B2.id] = B2
-    var defDown = def; defDown.aEdge = .down; defDown.offsetMM = 100
-    let newR1 = NewRulePlacement.make(id: "r-new", me: studio, peer: book, local: U, remote: B2, existing: [defDown], screens: all2)
-    check(newR1?.aEdge == .down, "已有规则把对方屏放在下方：新规则优先也放下边")
-    let newR2 = NewRulePlacement.make(id: "r-new", me: studio, peer: book, local: U, remote: B, existing: [def], screens: all)
-    check(newR2?.aEdge == .left, "右边不能用（内建屏左边已被 P2319H 的规则整段占用）→ 换到下一条能用的边（左边）")
+    let two = ScreenLayout.rules(from: ScreenLayout.placed(spots: layoutWith(CGPoint(x: 1106, y: 46.5),
+                                                                              [ScreenSpot(device: book, screen: "B2", x: 300, y: 340)]),
+                                                           present: [], info: { all2[$1] }),
+                                 me: studio, peer: book, existing: [def], newID: { "r-b2" })
+    check(two.count == 2 && two.contains { $0.id == "r-def" && $0.bScreen == "BUILTIN" }
+          && two.contains { $0.id == "r-b2" && $0.aScreen == "U2720QM" && $0.aEdge == .down && approx($0.offsetMM, 300) },
+          "对方两块屏各挨一块本机屏：两条规则，旧的一对沿用 ID，新挨上的一对用新 ID")
+    let ghost = AdjacencyRule(id: "r-ghost", aDevice: studio, aScreen: "OLD", aEdge: .left, bDevice: book, bScreen: "BUILTIN", offsetMM: 0)
+    check(derive(layoutWith(CGPoint(x: 1106, y: 46.5)), existing: [def, ghost]).contains(ghost),
+          "规则里有布局里没有（不知道尺寸）的屏：原样保留")
+    let missing = ScreenLayout.placed(spots: layoutWith(CGPoint(x: 1106, y: 46.5)), present: [(device: studio, info: U), (device: book, info: B2)],
+                                      info: { all2[$1] })
+    check(missing.first { $0.info.id == "P2319H" }?.present == false && missing.first { $0.info.id == "U2720QM" }?.present == true,
+          "布局里有、现在没接着的屏：留在原处，标成没接上")
+    check(missing.first { $0.info.id == "B2" }.map { approx($0.x, 1106 + 301 + kNewScreenGapMM) && approx($0.y, 46.5) } == true,
+          "现在接着、布局里还没有的屏：放到最右边，隔开 \(Int(kNewScreenGapMM)) 毫米（不凭空多出能跨的边）")
 
-    print("== 拖动吸附")
-    let snapped = RuleDrag.snap(CGPoint(x: 512, y: 60), local: P, remote: B, base: vS)
-    check(snapped.localEdge == .right && approx(snapped.offsetMM, 60), "拖到右边附近：吸附到右边，沿边 60 毫米")
-    let snapC = RuleDrag.snap(CGPoint(x: 507, y: 44), local: P, remote: B, base: vS)
-    check(approx(snapC.offsetMM, 46.5), "离中点对齐 2.5 毫米：吸到中点对齐")
-    let snapD = RuleDrag.snap(CGPoint(x: 150, y: 295), local: P, remote: B, base: vS)
-    check(snapD.localEdge == .down && approx(snapD.offsetMM, 150), "拖到下方：换到下边")
+    print("== 拖动：吸附、不能叠放")
+    let others = [CGRect(x: 0, y: 0, width: 599, height: 340), CGRect(x: 599, y: 0, width: 507, height: 288)]
+    func bRect(_ x: Double, _ y: Double) -> CGRect { CGRect(x: x, y: y, width: 301, height: 195) }
+    check(ScreenLayout.snapped(bRect(1106 + 12, 50), among: others) == CGPoint(x: 1106, y: 46.5),
+          "拖到 P2319H 右边 12 毫米处：贴上右边，沿边吸到中点对齐")
+    check(ScreenLayout.snapped(bRect(1106 + 30, 50), among: others) == CGPoint(x: 1136, y: 50), "离边 30 毫米：不吸附")
+    check(ScreenLayout.snapped(bRect(700, 300), among: others) == CGPoint(x: 702, y: 288), "拖到 P2319H 下方：贴上下边，左右吸到中对中")
+    check(ScreenLayout.snapped(bRect(1106 + 5, -8), among: others) == CGPoint(x: 1106, y: 0), "靠近右上角：贴上右边、顶部对齐")
+    check(!ScreenLayout.overlaps(others[0], others[1]) && ScreenLayout.overlaps(bRect(1000, 100), others[1]),
+          "两块屏边挨着不算叠放；伸进别的屏里算叠放（不能放下，弹回原处）")
+
+    print("== 旧数据迁移：只有规则、没有布局")
+    let mig1 = ScreenLayout.migrated(rules: [def], me: studio, localScreens: [U, P], peer: book, peerScreens: [B], info: info)
+    check(mig1 == defLayout, "只有默认规则：摆出来和默认布局一样")
+    check(ScreenLayout.rules(from: placedOf(mig1), me: studio, peer: book, existing: [def], newID: { "x" }) == [def],
+          "从迁移出的布局重新推导：还是原来那条规则（ID 不变）")
+    let rDown = AdjacencyRule(id: "r-down", aDevice: studio, aScreen: "U2720QM", aEdge: .down, bDevice: book, bScreen: "BUILTIN", offsetMM: 100)
+    let mig2 = ScreenLayout.migrated(rules: [def, rDown], me: studio, localScreens: [U, P], peer: book, peerScreens: [B, B2], info: { all2[$1] })
+    let mig2Rules = ScreenLayout.rules(from: ScreenLayout.placed(spots: mig2, present: [], info: { all2[$1] }),
+                                       me: studio, peer: book, existing: [def, rDown], newID: { "x" })
+    check(spot(mig2, book, "BUILTIN").map { approx($0.x, 1106) && approx($0.y, 46.5) } == true && mig2Rules == [def],
+          "两条规则都提到内建屏：按第一条摆；第二条（U2720QM 下边）几何上挨不上，就此去掉")
+    check(spot(mig2, book, "B2").map { approx($0.x, 1106 + 301 + kNewScreenGapMM) } == true, "规则没提到的对方屏：放到最右边，隔开放")
+    let migU = ScreenLayout.migrated(rules: [rU], me: studio, localScreens: [U, P], peer: book, peerScreens: [B], info: info)
+    let migURules = ScreenLayout.rules(from: placedOf(migU), me: studio, peer: book, existing: [rU], newID: { "x" })
+    check(migURules == [rU], "规则把内建屏摆到 U2720QM 右边下段（换成毫米会和 P2319H 叠上）：照规则摆，规则保留，由用户拖开")
+    let migGone = ScreenLayout.migrated(rules: [def], me: book, localScreens: [B], peer: studio, peerScreens: [U],
+                                        info: info)
+    check(spot(migGone, studio, "P2319H").map { approx($0.x, -507) && approx($0.y, -46.5) } == true
+          && spot(migGone, studio, "U2720QM").map { approx($0.x, 301 + kNewScreenGapMM) && $0.y == 0 } == true,
+          "从被控一侧迁移、对方 P2319H 拔掉了：拔掉的屏也按规则摆（贴着内建屏左边）；规则没提到的 U2720QM 放到最右边")
 
     print("== 显示器位置后缀")
     check(ScreenNaming.labels([U, P]) == ["U2720QM": "DELL U2720QM（左）", "P2319H": "DELL P2319H（右）"],
@@ -237,7 +337,7 @@ func unitTests() {
     let D2 = ScreenInfo(id: "D2", name: "b", isMain: false, isBuiltin: false, x: 1000, y: 800, w: 1000, h: 800, mmW: 300, mmH: 200, estimated: false)
     check(ScreenNaming.suffixes([D1, D2]) == ["D1": "左上", "D2": "右下"], "斜着摆：左上 / 右下")
 
-    print("== 共享设置：规则同步、旧数据、默认规则只补一次")
+    print("== 共享设置：布局和规则同步、旧数据、默认布局只生成一次")
     let s = SharedSettings(revision: 3, editor: "a", controllerID: "a", rules: [def], rulesInitialized: true, ripple: .defaults)
     var s3 = s; s3.revision = 4
     check(s3.isNewer(than: s) && !s.isNewer(than: s3), "修订号大的更新")
@@ -250,15 +350,28 @@ func unitTests() {
     check(!bad.isValid(me: studio, peer: book), "出现陌生 ID 的设置不合法")
     let sBack = try! JSONDecoder().decode(SharedSettings.self, from: try! JSONEncoder().encode(sv))
     check(sBack == sv && sBack.rules.first?.view(from: book) == vB, "规则随共享设置编码再解码原样保留，对方解出来的视角正确")
+    var sl = sv; sl.layout = defLayout
+    let slBack = try! JSONDecoder().decode(SharedSettings.self, from: try! JSONEncoder().encode(sl))
+    check(slBack == sl && slBack.layout == defLayout && sl.isValid(me: book, peer: studio), "布局随共享设置编码再解码原样保留")
+    var badLayout = sl; badLayout.layout.append(ScreenSpot(device: "x", screen: "S", x: 0, y: 0))
+    check(!badLayout.isValid(me: studio, peer: book), "布局里出现陌生设备 ID：不合法")
+    var nanLayout = sl; nanLayout.layout[0].x = .nan
+    check(!nanLayout.isValid(me: studio, peer: book), "布局里的坐标不是有限数：不合法")
+    let noLayoutJSON = #"{"revision":20,"editor":"x","controllerID":"x","rules":[],"rulesInitialized":true,"ripple":{"enabled":true}}"#
+    let noLayout = try! JSONDecoder().decode(SharedSettings.self, from: Data(noLayoutJSON.utf8))
+    check(noLayout.layout.isEmpty && noLayout.needsLayoutMigration && !noLayout.needsDefaultLayout,
+          "上一版数据（有规则、没有布局字段）：布局读成空，等按规则摆出布局")
+    check(!sl.needsLayoutMigration, "有布局的数据不用迁移")
     let oldJSON = #"{"revision":15,"editor":"x","controllerID":"x","layoutAnchor":"x","layoutOtherIs":"right","ripple":{"enabled":true}}"#
     let oldS = try! JSONDecoder().decode(SharedSettings.self, from: Data(oldJSON.utf8))
-    check(oldS.rules.isEmpty && !oldS.rulesInitialized && oldS.needsDefaultRule && oldS.revision == 15,
-          "旧版数据（只有已废弃的方向字段）：读成「还没有规则、需要补生成默认规则」")
+    check(oldS.rules.isEmpty && oldS.layout.isEmpty && !oldS.rulesInitialized && oldS.needsDefaultLayout
+          && !oldS.needsLayoutMigration && oldS.revision == 15,
+          "更早的数据（只有已废弃的方向字段）：读成「还没有布局、需要生成默认布局」")
     var up = oldS
-    up.rules.append(def); up.rulesInitialized = true
-    check(!up.needsDefaultRule, "补生成后标记已生成")
+    up.layout = defLayout; up.rules = [def]; up.rulesInitialized = true
+    check(!up.needsDefaultLayout && !up.needsLayoutMigration, "生成后标记已生成")
     up.rules.removeAll()
-    check(!up.needsDefaultRule, "之后规则删光：不再补")
+    check(!up.needsDefaultLayout, "之后屏全拖开、规则没了：不再补")
 
     print("== 波纹参数")
     var r = RippleConfig.defaults

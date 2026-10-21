@@ -11,6 +11,8 @@ let outDir = CommandLine.arguments[1]
 let designDir = CommandLine.arguments[2]
 let app = NSApplication.shared
 app.setActivationPolicy(.prohibited)
+// 不是 .app，没有 Contents/Resources：程序图标按路径从仓库的 Resources/ 读
+AppIcon.resourceDirectory = URL(fileURLWithPath: designDir).deletingLastPathComponent().appendingPathComponent("Resources")
 
 let book = DeviceIdentity(id: "aaaa-book", name: "我的 MacBook Pro", isLaptop: true)
 let mini = DeviceIdentity(id: "bbbb-mini", name: "书房 Mac mini", isLaptop: false)
@@ -18,8 +20,8 @@ let miniDev = DiscoveredDevice(id: mini.id, name: mini.name,
                                endpoint: .service(name: mini.name, type: kPairServiceType, domain: "local.", interface: nil))
 
 // 作者两台机器的真实屏幕数据（用来渲染界面预览）
-let studioDev = DeviceIdentity(id: "studio-dev", name: "Mac Studio", isLaptop: false)
-let bookDev = DeviceIdentity(id: "book-dev", name: "MacBook Pro", isLaptop: true)
+let studioDev = DeviceIdentity(id: "studio-dev", name: "我的 Mac Studio", isLaptop: false)
+let bookDev = DeviceIdentity(id: "book-dev", name: "我的 MacBook Pro", isLaptop: true)
 let scrU = ScreenInfo(id: "U2720QM", name: "DELL U2720QM", isMain: true, isBuiltin: false,
                       x: 0, y: 0, w: 2560, h: 1440, mmW: 599, mmH: 340, estimated: false)
 let scrP = ScreenInfo(id: "P2319H", name: "DELL P2319H", isMain: false, isBuiltin: false,
@@ -37,18 +39,22 @@ func pairedModel(me: DeviceIdentity, peer: DeviceIdentity, controller: Bool, dir
     return m
 }
 
-/// 06 页：本机 Mac Studio（两块 DELL）+ 对方 MacBook，默认规则
-func rulesModel(asStudio: Bool = true, rules: (AdjacencyRule) -> [AdjacencyRule] = { [$0] }) -> AppModel {
+/// 06 页：本机 Mac Studio（两块 DELL）+ 对方 MacBook。两块 DELL 按 macOS 排列摆，bookAt 是内建屏在布局里的左上角（毫米），
+/// 默认是设计稿的摆法：内建屏在 P2319H 下方、中对中。规则从布局推导（和真实拖动放下时一样）
+let designBookAt = CGPoint(x: 599 + (507 - 301) / 2, y: 288)
+func layoutModel(asStudio: Bool = true, bookAt: CGPoint = designBookAt) -> AppModel {
     let me = asStudio ? studioDev : bookDev, peer = asStudio ? bookDev : studioDev
     let m = pairedModel(me: me, peer: peer, controller: asStudio)
     m.localScreens = asStudio ? [scrU, scrP] : [scrB]
     m.peerScreens = asStudio ? [scrB] : [scrU, scrP]
     for s in [scrU, scrP, scrB] { m.knownScreens[s.id] = s }
-    let def = DefaultRule.make(controller: studioDev.id, controllerScreens: [scrU, scrP], controlled: bookDev.id,
-                               controlledScreens: [scrB], id: "rule-default")!
-    m.shared?.rules = rules(def)
+    m.shared?.layout = [ScreenSpot(device: studioDev.id, screen: "U2720QM", x: 0, y: 0),
+                        ScreenSpot(device: studioDev.id, screen: "P2319H", x: 599, y: 0),
+                        ScreenSpot(device: bookDev.id, screen: "BUILTIN", x: bookAt.x, y: bookAt.y)]
+    var n = 0
+    m.shared?.rules = ScreenLayout.rules(from: m.placedScreens, me: me.id, peer: peer.id, existing: [],
+                                         newID: { n += 1; return "rule-\(n)" })
     m.shared?.rulesInitialized = true
-    m.selectedRuleID = m.shared?.rules.first?.id
     m.peerScreensFresh = true
     return m
 }
@@ -79,64 +85,35 @@ let shots: [Shot] = [
         m.dialog = .enterCode(miniDev)
         return m
     },
-    Shot(name: "06-rules", design: "R9pul") { rulesModel() },
-    Shot(name: "06A-add-rule", design: "sxiFo") {
-        let m = rulesModel()
-        m.dialog = .addRule
-        return m
-    },
-    Shot(name: "06-controlled-view", design: nil) { rulesModel(asStudio: false) },
-    Shot(name: "06-u2720-lower", design: nil) {
-        rulesModel { _ in [AdjacencyRule(id: "r-u", aDevice: studioDev.id, aScreen: "U2720QM", aEdge: .right,
-                                         bDevice: bookDev.id, bScreen: "BUILTIN", offsetMM: 200)] }
-    },
-    Shot(name: "06-two-dells-below", design: nil) {
-        let m = rulesModel { _ in [
-            AdjacencyRule(id: "r1", aDevice: studioDev.id, aScreen: "U2720QM", aEdge: .down, bDevice: bookDev.id,
-                          bScreen: "BUILTIN", offsetMM: 599 - 150),
-            AdjacencyRule(id: "r2", aDevice: studioDev.id, aScreen: "P2319H", aEdge: .down, bDevice: bookDev.id,
-                          bScreen: "BUILTIN", offsetMM: -150)] }
-        m.selectedRuleID = "r2"
-        return m
-    },
-    Shot(name: "06-rule-inactive", design: nil) {
-        let m = rulesModel()
+    Shot(name: "06-layout", design: "R9pul") { layoutModel() },
+    Shot(name: "06-default-layout", design: nil) { layoutModel(bookAt: CGPoint(x: 1106, y: 46.5)) },
+    Shot(name: "06-controlled-view", design: nil) { layoutModel(asStudio: false) },
+    Shot(name: "06-two-seams", design: nil) { layoutModel(bookAt: CGPoint(x: 599, y: 288)) },
+    Shot(name: "06-no-crossing", design: nil) { layoutModel(bookAt: CGPoint(x: 1106 + 60, y: 46.5)) },
+    Shot(name: "06-unplugged", design: nil) {
+        let m = layoutModel()
         m.localScreens = [scrU]           // P2319H 拔掉了
         return m
     },
-    Shot(name: "06-no-rules", design: nil) { rulesModel { _ in [] } },
     Shot(name: "06-offline", design: nil) {
-        let m = rulesModel()
+        let m = layoutModel()
         m.linkStatus = .offline
         return m
     },
+    Shot(name: "06-new-screen", design: nil) {
+        let m = layoutModel(bookAt: CGPoint(x: 1106, y: 46.5))
+        m.peerScreens.append(ScreenInfo(id: "B2", name: "LG HDR 4K", isMain: false, isBuiltin: false, x: 1512, y: 0,
+                                        w: 2560, h: 1440, mmW: 600, mmH: 340, estimated: false))
+        return m
+    },
     Shot(name: "06-drag-overlap", design: nil) {
-        let m = rulesModel { _ in [
-            AdjacencyRule(id: "r1", aDevice: studioDev.id, aScreen: "U2720QM", aEdge: .down, bDevice: bookDev.id,
-                          bScreen: "BUILTIN", offsetMM: 599 - 150),
-            AdjacencyRule(id: "r2", aDevice: studioDev.id, aScreen: "P2319H", aEdge: .down, bDevice: bookDev.id,
-                          bScreen: "BUILTIN", offsetMM: -150)] }
-        m.selectedRuleID = "r2"
-        m.previewDragOverride = RuleView(ruleID: "r2", localScreen: "P2319H", localEdge: .down,
-                                         remoteScreen: "BUILTIN", offsetMM: -100)
+        let m = layoutModel()
+        m.previewDragOverride = ScreenSpot(device: bookDev.id, screen: "BUILTIN", x: 900, y: 200)
         return m
     },
-    Shot(name: "06-drag-short", design: nil) {
-        let m = rulesModel()
-        m.previewDragOverride = RuleView(ruleID: "rule-default", localScreen: "P2319H", localEdge: .right,
-                                         remoteScreen: "BUILTIN", offsetMM: 282)
-        return m
-    },
-    Shot(name: "06-drag-covers-own", design: nil) {
-        let m = rulesModel { _ in [AdjacencyRule(id: "r-u", aDevice: studioDev.id, aScreen: "U2720QM", aEdge: .right,
-                                                 bDevice: bookDev.id, bScreen: "BUILTIN", offsetMM: 200)] }
-        m.previewDragOverride = RuleView(ruleID: "r-u", localScreen: "U2720QM", localEdge: .right,
-                                         remoteScreen: "BUILTIN", offsetMM: 150)
-        return m
-    },
-    Shot(name: "08-delete-last-rule", design: nil) {
-        let m = rulesModel()
-        m.dialog = .confirmDeleteLastRule
+    Shot(name: "06-drag-snapped", design: nil) {
+        let m = layoutModel()
+        m.previewDragOverride = ScreenSpot(device: bookDev.id, screen: "BUILTIN", x: 1106, y: 46.5)
         return m
     },
     Shot(name: "07-ripple", design: "G2wLHj") {
@@ -265,7 +242,8 @@ for shot in shots {
     let path = "\(outDir)/\(shot.name).png"
     save(rep, path)
     var line = "\(shot.name): \(Int(frameView.bounds.width))×\(Int(frameView.bounds.height)) → \(path)"
-    if let d = shot.design, let img = NSImage(contentsOfFile: "\(designDir)/v5/2x/\(d).png")
+    if let d = shot.design, let img = NSImage(contentsOfFile: "\(designDir)/v6/2x/\(d).png")
+        ?? NSImage(contentsOfFile: "\(designDir)/v5/2x/\(d).png")
         ?? NSImage(contentsOfFile: "\(designDir)/v4/2x/\(d).png")
         ?? NSImage(contentsOfFile: "\(designDir)/v3/2x/\(d).png") {
         let cmp = "\(outDir)/\(shot.name)-对照.png"
@@ -273,7 +251,7 @@ for shot in shots {
         line += "，对照图 \(cmp)"
     }
     print(line)
-    if shot.name == "06-rules" {
+    if shot.name == "06-layout" {
         // 标题栏右侧的切换按钮能不能点到：看「光标特效」那一点被谁接住（不能是系统标题栏 / 工具栏）
         let hit = frameView.hitTest(NSPoint(x: 836, y: kWindowSize.height - 27))
         var chain: [String] = []
@@ -307,6 +285,35 @@ do {
     print("07-preview-frozen：出环命令 \(pv.spawned.count) 条（左 \(pv.spawned.filter { $0.side == .left }.count)、右 \(pv.spawned.filter { $0.side == .right }.count)） → \(outDir)/07-preview-frozen.png")
     RingHostView.frozenProgress = nil
     wc.window.close()
+}
+
+// 程序图标：读到的是矢量还是位图；再把菜单栏用的 24 点图标按模板图分别画在浅色、深色底上（2x），检查透明和反白
+if let icon = AppIcon.image(points: 24) {
+    print("程序图标：\(icon.representations.map { String(describing: type(of: $0)) }.joined(separator: "、"))，模板图 \(icon.isTemplate)")
+    let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 4 * 24 * 2, pixelsHigh: 2 * 24 * 2, bitsPerSample: 8,
+                               samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+                               bytesPerRow: 0, bitsPerPixel: 0)!
+    rep.size = NSSize(width: 4 * 24, height: 2 * 24)
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+    for (i, (bg, fg)) in [(NSColor(white: 0.93, alpha: 1), NSColor.black), (NSColor(white: 0.15, alpha: 1), NSColor.white)].enumerated() {
+        let cell = NSRect(x: Double(i) * 48, y: 0, width: 48, height: 48)
+        bg.setFill()
+        cell.fill()
+        // 模板图按「只用透明度」着色：先画图标当遮罩，再用前景色填
+        let tinted = NSImage(size: icon.size, flipped: false) { r in
+            icon.draw(in: r)
+            fg.set()
+            r.fill(using: .sourceAtop)
+            return true
+        }
+        tinted.draw(in: NSRect(x: cell.minX + 12, y: 12, width: 24, height: 24))
+    }
+    NSGraphicsContext.restoreGraphicsState()
+    save(rep, "\(outDir)/icon-menubar.png")
+    print("菜单栏图标（浅色、深色菜单栏）→ \(outDir)/icon-menubar.png")
+} else {
+    print("程序图标：没读到（\(AppIcon.resourceDirectory?.path ?? "没有资源目录")）")
 }
 
 print("完成")

@@ -1,10 +1,9 @@
 // 屏幕相邻规则的纯逻辑（不碰系统接口，自测里直接断言）：
 //   - 屏幕信息 ScreenInfo（稳定 ID、名字、是否主屏、点坐标框、物理毫米尺寸、尺寸是否估算）；
-//   - 相邻规则 AdjacencyRule = 甲屏的某条边 ↔ 乙屏的对边 + 沿边错开的毫米数。两台存同一份，各自换算成本机视角 RuleView；
+//   - 相邻规则 AdjacencyRule = 甲屏的某条边 ↔ 乙屏的对边 + 沿边错开的毫米数。两台存同一份，各自换算成本机视角 RuleView。
+//     规则由「设备连接」页上摆放的布局推导出来（见 Layout.swift），用户看不到规则本身；
 //   - 毫米 ↔ 点换算（点 = 毫米 / 边的物理长度 × 边的点长度），两条边实际挨着的那一段（重叠段）；
 //   - 跨屏判定：前后两点连线穿过规则段落就跨过去（快速甩过短段也不漏），落点按毫米对应到对方屏那条边；
-//   - 约束校验：同两块屏只能一条规则、同一条边上各规则的段落不重叠、挨着至少 10 毫米、盖住自家相通段只提醒；
-//   - 默认规则：主控最右侧屏的右边 ↔ 被控最左侧屏的左边，中点对齐；
 //   - 显示器位置后缀：同一台多块屏时按系统排列加「左 / 右 / 上 / 下 / 中」及组合。
 // 坐标一律是该台 Mac 的 CG 全局点坐标（原点在主屏左上角，y 向下）。「边」用 Direction 表示：up = 上边，down = 下边。
 // 沿边方向：左右两条竖边沿 y（向下增大），上下两条横边沿 x（向右增大）；两台规则里的沿边坐标按这个方向对齐。
@@ -227,150 +226,6 @@ struct CrossingMap {
     }
 }
 
-// MARK: - 约束校验
-
-enum RuleProblem: Equatable {
-    case duplicatePair                      // 已有这两块屏的规则
-    case tooShort(Double)                   // 挨着的长度不足 10 毫米（实际多少）
-    case overlap(String)                    // 和哪条规则在同一条边上重叠（规则 ID）
-    case missingScreen                      // 有一块屏现在不在（拔掉了）
-}
-
-enum RuleWarning: Equatable {
-    case coversOwnShared(String)            // 盖住了自家相通的一段（被盖住的是哪块屏的 ID）
-}
-
-enum RuleCheck {
-    /// 某块屏某条边被一条规则占用的毫米区间（以这块屏为准）
-    static func segment(of rule: AdjacencyRule, screen: String, device: String,
-                        screens: [String: ScreenInfo]) -> (edge: Direction, lo: Double, hi: Double)? {
-        guard let v = rule.view(from: device), v.localScreen == screen,
-              let l = screens[v.localScreen], let r = screens[v.remoteScreen] else { return nil }
-        let t = v.touch(l, r)
-        return (v.localEdge, t.lo, t.hi)
-    }
-
-    /// 校验一条规则（新加的或拖动中的）。others 是除它以外的规则；screens 是两台全部屏幕（ID 不会重复）。
-    static func problems(_ rule: AdjacencyRule, others: [AdjacencyRule],
-                         screens: [String: ScreenInfo]) -> [RuleProblem] {
-        var out: [RuleProblem] = []
-        if others.contains(where: { o in
-            Set([o.aScreen, o.bScreen]) == Set([rule.aScreen, rule.bScreen])
-        }) {
-            out.append(.duplicatePair)
-        }
-        guard let a = screens[rule.aScreen], let b = screens[rule.bScreen] else {
-            out.append(.missingScreen)
-            return out
-        }
-        guard let va = rule.view(from: rule.aDevice) else { return out }
-        let t = va.touch(a, b)
-        if t.hi - t.lo < kMinTouchMM - 0.001 { out.append(.tooShort(max(0, t.hi - t.lo))) }
-        // 两块屏各自那条边上，和别的规则的段落不能重叠（首尾相接可以）
-        for (dev, scr) in [(rule.aDevice, rule.aScreen), (rule.bDevice, rule.bScreen)] {
-            guard let mine = segment(of: rule, screen: scr, device: dev, screens: screens) else { continue }
-            for o in others {
-                guard let theirs = segment(of: o, screen: scr, device: dev, screens: screens),
-                      theirs.edge == mine.edge else { continue }
-                if min(mine.hi, theirs.hi) - max(mine.lo, theirs.lo) > 0.01, !out.contains(.overlap(o.id)) {
-                    out.append(.overlap(o.id))
-                }
-            }
-        }
-        return out
-    }
-
-    /// 规则段落盖住了自家两块屏原本相通的一段：只提醒，不阻止
-    static func warnings(_ rule: AdjacencyRule, screensByDevice: [String: [ScreenInfo]]) -> [RuleWarning] {
-        var out: [RuleWarning] = []
-        let all = Dictionary(screensByDevice.values.flatMap { $0 }.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-        for dev in [rule.aDevice, rule.bDevice] {
-            guard let v = rule.view(from: dev), let s = all[v.localScreen], let r = all[v.remoteScreen] else { continue }
-            let t = v.touch(s, r)
-            guard t.hi > t.lo else { continue }
-            let lo = s.mmToPt(t.lo, v.localEdge), hi = s.mmToPt(t.hi, v.localEdge)
-            for (slo, shi) in ownShared(s, v.localEdge, among: screensByDevice[dev] ?? []) where min(hi, shi) - max(lo, slo) > 0.5 {
-                out.append(.coversOwnShared(s.id))
-                break
-            }
-        }
-        return out
-    }
-
-    /// 本机屏 s 的 e 边上，和自家别的屏挨着（光标原本能走过去）的点区间
-    static func ownShared(_ s: ScreenInfo, _ e: Direction, among screens: [ScreenInfo]) -> [(Double, Double)] {
-        let f = s.frame
-        var out: [(Double, Double)] = []
-        for o in screens where o.id != s.id {
-            let g = o.frame
-            let touching: Bool
-            switch e {
-            case .right: touching = abs(g.minX - f.maxX) < 1
-            case .left: touching = abs(g.maxX - f.minX) < 1
-            case .down: touching = abs(g.minY - f.maxY) < 1
-            case .up: touching = abs(g.maxY - f.minY) < 1
-            }
-            guard touching else { continue }
-            let lo = e.isVertical ? max(f.minX, g.minX) : max(f.minY, g.minY)
-            let hi = e.isVertical ? min(f.maxX, g.maxX) : min(f.maxY, g.maxY)
-            if hi > lo { out.append((lo, hi)) }
-        }
-        return out
-    }
-}
-
-// MARK: - 默认规则
-
-enum DefaultRule {
-    /// 某台最右（right）/ 最左（left）的屏：边缘最靠外的；并列时取主屏，主屏不在其中就取最上面那块
-    static func outermost(_ screens: [ScreenInfo], _ side: Direction) -> ScreenInfo? {
-        guard !screens.isEmpty else { return nil }
-        func edge(_ s: ScreenInfo) -> Double {
-            switch side {
-            case .right: return s.x + s.w
-            case .left: return -s.x
-            case .down: return s.y + s.h
-            case .up: return -s.y
-            }
-        }
-        let best = screens.map(edge).max()!
-        let tied = screens.filter { abs(edge($0) - best) < 1 }
-        if let m = tied.first(where: { $0.isMain }) { return m }
-        return tied.min(by: { $0.y < $1.y })
-    }
-
-    /// 主控最右侧屏的右边 ↔ 被控最左侧屏的左边，中点对齐
-    static func make(controller: String, controllerScreens: [ScreenInfo],
-                     controlled: String, controlledScreens: [ScreenInfo], id: String) -> AdjacencyRule? {
-        guard let a = outermost(controllerScreens, .right), let b = outermost(controlledScreens, .left) else { return nil }
-        let offset = (a.edgeLengthMM(.right) - b.edgeLengthMM(.left)) / 2
-        return AdjacencyRule(id: id, aDevice: controller, aScreen: a.id, aEdge: .right,
-                             bDevice: controlled, bScreen: b.id, offsetMM: offset)
-    }
-}
-
-// MARK: - 新规则的初始位置
-
-enum NewRulePlacement {
-    /// 优先用对方那台已有规则所在方向的边，不能用就按右、左、下、上找第一条能用的边；两边中点对齐。
-    static func make(id: String, me: String, peer: String, local: ScreenInfo, remote: ScreenInfo,
-                     existing: [AdjacencyRule], screens: [String: ScreenInfo]) -> AdjacencyRule? {
-        var order: [Direction] = []
-        for r in existing {
-            if let v = r.view(from: me), !order.contains(v.localEdge) { order.append(v.localEdge) }
-        }
-        for d in [Direction.right, .left, .down, .up] where !order.contains(d) { order.append(d) }
-        for e in order {
-            let offset = (local.edgeLengthMM(e) - remote.edgeLengthMM(e.opposite)) / 2
-            let r = AdjacencyRule.make(id: id, me: me, peer: peer,
-                                       view: RuleView(ruleID: id, localScreen: local.id, localEdge: e,
-                                                      remoteScreen: remote.id, offsetMM: offset))
-            if RuleCheck.problems(r, others: existing, screens: screens).isEmpty { return r }
-        }
-        return nil
-    }
-}
-
 // MARK: - 显示器位置后缀
 
 enum ScreenNaming {
@@ -433,45 +288,4 @@ struct CrossPayload: Codable, Equatable {
     var screen: String
     var edge: Direction
     var mm: Double
-}
-
-// MARK: - 预览里拖动对方屏幕（纯逻辑）
-
-enum RuleDrag {
-    /// 规则在预览里的摆法：本机屏放在 (0, 0)，对方屏左上角的毫米坐标
-    static func remoteOrigin(_ v: RuleView, local l: ScreenInfo, remote r: ScreenInfo) -> CGPoint {
-        switch v.localEdge {
-        case .right: return CGPoint(x: l.mmW, y: v.offsetMM)
-        case .left: return CGPoint(x: -r.mmW, y: v.offsetMM)
-        case .down: return CGPoint(x: v.offsetMM, y: l.mmH)
-        case .up: return CGPoint(x: v.offsetMM, y: -r.mmH)
-        }
-    }
-
-    /// 拖动中对方屏左上角到了 p（毫米），吸附到最近的一条边上；沿边位置靠近「中点对齐 / 两端对齐」6 毫米以内时吸过去
-    static func snap(_ p: CGPoint, local l: ScreenInfo, remote r: ScreenInfo, base v: RuleView) -> RuleView {
-        var best: (d: Double, view: RuleView)?
-        for e in [Direction.right, .left, .down, .up] {
-            let cross: Double
-            var along: Double
-            switch e {
-            case .right: cross = abs(p.x - l.mmW); along = p.y
-            case .left: cross = abs(p.x + r.mmW); along = p.y
-            case .down: cross = abs(p.y - l.mmH); along = p.x
-            case .up: cross = abs(p.y + r.mmH); along = p.x
-            }
-            // 离开本机屏太远（沿边完全不挨着）的边也算距离，让光标拖到哪边就吸到哪边
-            let lenL = l.edgeLengthMM(e), lenR = r.edgeLengthMM(e.opposite)
-            let outside = max(0, -(along + lenR), along - lenL)
-            let d = cross + outside
-            for target in [(lenL - lenR) / 2, 0, lenL - lenR] where abs(along - target) <= 6 {
-                along = target
-                break
-            }
-            let view = RuleView(ruleID: v.ruleID, localScreen: v.localScreen, localEdge: e,
-                                remoteScreen: v.remoteScreen, offsetMM: (along * 10).rounded() / 10)
-            if best == nil || d < best!.d { best = (d, view) }
-        }
-        return best!.view
-    }
 }

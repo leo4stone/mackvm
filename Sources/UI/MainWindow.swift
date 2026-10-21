@@ -36,7 +36,7 @@ final class MainWindowController: NSObject, NSWindowDelegate {
         window.center()
     }
 
-    /// 真实运行时才装（离屏渲染不装）：本应用重新激活时，复位弹窗以外的临时交互状态（拖动中、规则列表弹出框）
+    /// 真实运行时才装（离屏渲染不装）：本应用重新激活时，复位弹窗以外的临时交互状态（预览里拖动中的屏）
     func startReactivationReset() {
         guard activeObserver == nil else { return }
         activeObserver = NotificationCenter.default.addObserver(
@@ -62,7 +62,7 @@ final class MainWindowController: NSObject, NSWindowDelegate {
             model.cancelInvite()
         case .seek, .noDevices, .enterCode:
             model.cancelSeek()
-        case .pairSuccess, .linkInfo, .confirmSwap, .confirmUnpair, .addRule, .confirmDeleteLastRule:
+        case .pairSuccess, .linkInfo, .confirmSwap, .confirmUnpair:
             model.dialog = nil
         case nil:
             break
@@ -101,7 +101,7 @@ struct RootView: View {
     }
 }
 
-/// 54 点高的标题栏：居中的应用名，右侧「设备连接 / 光标特效」切换（未配对时只有「设备连接」）
+/// 54 点高的标题栏：居中的图标加应用名，右侧「设备连接 / 光标特效」切换（未配对时只有「设备连接」）
 struct TitleBar: View {
     @EnvironmentObject var model: AppModel
 
@@ -109,7 +109,11 @@ struct TitleBar: View {
         ZStack {
             // 内容铺满了标题栏区域，拖动窗口靠这个手势
             Theme.titleBG.gesture(WindowDragGesture())
-            Text("MacKVM").font(.ui(14, .semibold)).foregroundStyle(Theme.text).allowsHitTesting(false)
+            HStack(spacing: 8) {
+                AppIconView(size: 22).foregroundStyle(Theme.text)
+                Text("MacKVM").font(.ui(14, .semibold)).foregroundStyle(Theme.text)
+            }
+            .allowsHitTesting(false)
             HStack {
                 Spacer()
                 HStack(spacing: 2) {
@@ -175,8 +179,6 @@ struct DialogLayer: View {
                     case .linkInfo: LinkInfoDialog()
                     case .confirmUnpair: UnpairConfirmDialog()
                     case .confirmSwap: SwapConfirmDialog()
-                    case .addRule: AddRuleDialog()
-                    case .confirmDeleteLastRule: DeleteLastRuleDialog()
                     }
                 }
                 .compositingGroup()
