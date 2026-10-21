@@ -598,22 +598,162 @@ func unitTests() {
     check((0..<7).map { cycledColor(cs, $0) } == ["#111111", "#222222", "#333333", "#111111", "#222222", "#333333", "#111111"],
           "第 1、2、3 个环依次取色，用完回到第 1 个")
     check(cycledColor(["#ABCDEF"], 5) == "#ABCDEF", "只有一个颜色时每个环都用它")
-    check(RippleConfig.defaults.leaveColors == ["#2869E8", "#9166D8", "#27A7A0"] && RippleConfig.defaults.arriveColors == RippleConfig.defaults.leaveColors,
-          "默认两组都是设计稿的蓝、紫、青")
+    check(RippleConfig.defaults.leaveColors == ["#FFFFFF", "#000000"], "离开波纹默认颜色：先白后黑")
+    check(RippleConfig.defaults.arriveColors == ["#000000", "#FFFFFF"], "进入波纹默认颜色：先黑后白")
     var rc = RippleConfig.defaults
     rc.leaveColors = []
     rc.arriveColors = ["#ff0000", "zzz", "#00ff00", "#0000FF", "#123456", "#654321", "#ABCDEF"]
     let rcs = rc.sanitized()
-    check(rcs.leaveColors == RippleConfig.defaultColors, "颜色列表空了 → 回到默认三色（每组至少一个）")
+    check(rcs.leaveColors == RippleConfig.defaultLeaveColors, "颜色列表空了 → 回到这一组的默认颜色（每组至少一个）")
+    var rc2 = RippleConfig.defaults; rc2.arriveColors = ["zzz"]
+    check(rc2.sanitized().arriveColors == RippleConfig.defaultArriveColors, "进入波纹的颜色全不合法 → 回到进入波纹的默认颜色")
     check(rcs.arriveColors == ["#FF0000", "#00FF00", "#0000FF", "#123456", "#654321"], "非法色值去掉、统一大写、最多 5 个")
     let oldNoColor = try! JSONDecoder().decode(RippleConfig.self, from: Data(#"{"enabled":true,"leaveSize":120}"#.utf8))
-    check(oldNoColor.leaveColors == RippleConfig.defaultColors && oldNoColor.arriveColors == RippleConfig.defaultColors,
-          "旧数据没有颜色字段 → 补默认三色")
+    check(oldNoColor.leaveColors == RippleConfig.defaultLeaveColors && oldNoColor.arriveColors == RippleConfig.defaultArriveColors,
+          "旧数据没有颜色字段 → 两组各补自己的默认颜色")
     var withColor = RippleConfig.defaults; withColor.leaveColors = ["#FF8800"]; withColor.arriveColors = ["#00AA00", "#0055FF"]
     let sc = SharedSettings(revision: 9, editor: "a", controllerID: "a", ripple: withColor)
     let scBack = try! JSONDecoder().decode(SharedSettings.self, from: try! JSONEncoder().encode(sc))
     check(scBack.ripple.leaveColors == ["#FF8800"] && scBack.ripple.arriveColors == ["#00AA00", "#0055FF"], "颜色随共享设置编码再解码原样保留")
     check(hexColorString(parseHexColor("#9166d8")!) == "#9166D8", "色值解析和输出互逆")
+
+    print("== 取色器")
+    check(normalizedHexInput("#1a2b3c") == "#1A2B3C", "HEX 输入「#1a2b3c」有效，统一成大写")
+    check(normalizedHexInput("1A2B3C") == "#1A2B3C", "HEX 输入「1A2B3C」（不带 #）有效")
+    check(normalizedHexInput("#12345") == nil, "HEX 输入「#12345」（五位）无效")
+    check(normalizedHexInput("#GGGGGG") == nil, "HEX 输入「#GGGGGG」（不是十六进制）无效")
+    check(normalizedHexInput("+12345") == nil && normalizedHexInput("#１２３４５６") == nil, "带正号、全角数字的输入无效")
+    check(parseHexColor("#12345") == nil && parseHexColor("+12345") == nil, "色值解析同样只认六位十六进制")
+    // 色盘坐标 ↔ 饱和度 / 明度：往返一致；左上白、右上纯色相、下方黑
+    let fieldSize = CGSize(width: 174, height: 84)
+    var svOK = true
+    for x in stride(from: 0.0, through: 174.0, by: 14.5) {
+        for y in stride(from: 0.0, through: 84.0, by: 7.0) {
+            let sv = svValue(at: CGPoint(x: x, y: y), size: fieldSize)
+            let back = svPoint(s: sv.s, v: sv.v, size: fieldSize)
+            if abs(back.x - x) > 0.0001 || abs(back.y - y) > 0.0001 { svOK = false }
+        }
+    }
+    check(svOK, "色盘上的点 → 饱和度 / 明度 → 点，往返一致")
+    check(svValue(at: CGPoint(x: -20, y: 200), size: fieldSize) == (0, 0) && svValue(at: CGPoint(x: 999, y: -5), size: fieldSize) == (1, 1),
+          "拖出色盘时夹到边上")
+    check(hexFromHSV(HSV(h: 0.5, s: 0, v: 1)) == "#FFFFFF" && hexFromHSV(HSV(h: 0, s: 1, v: 1)) == "#FF0000"
+          && hexFromHSV(HSV(h: 0.3, s: 0.7, v: 0)) == "#000000", "色盘左上是白、右上是纯色相、下边是黑")
+    var hexOK = true
+    var seed: UInt64 = 0x1234_5678
+    for _ in 0..<2000 {
+        seed = seed &* 6364136223846793005 &+ 1442695040888963407
+        let hex = String(format: "#%06X", Int((seed >> 20) & 0xFFFFFF))
+        guard let c = hsvFromHex(hex), hexFromHSV(c) == hex else { hexOK = false; break }
+        // 再经过色盘坐标走一遍：颜色 → 坐标 → 颜色
+        let p = svPoint(s: c.s, v: c.v, size: fieldSize)
+        let sv = svValue(at: p, size: fieldSize)
+        if hexFromHSV(HSV(h: c.h, s: sv.s, v: sv.v)) != hex { hexOK = false; break }
+    }
+    check(hexOK, "2000 个随机颜色：HEX → 色相 / 饱和度 / 明度 → 色盘坐标 → HEX，往返一致")
+    let pm = ColorPickerModel()
+    var picked: [String] = []
+    pm.onPick = { picked.append($0) }
+    pm.load("#FF0000")
+    pm.setHue(1.0 / 3)
+    check(pm.hex == "#00FF00" && pm.hexText == "#00FF00" && picked == ["#00FF00"], "拖色相滑杆：颜色和输入框一起变，并立即应用")
+    pm.hexText = "1a2b3c"; pm.typed(pm.hexText)
+    check(pm.hex == "#1A2B3C" && pm.hexText == "1a2b3c" && picked.last == "#1A2B3C", "输入有效 HEX：立即应用，正在输的文字不被改写")
+    pm.commitText()
+    check(pm.hexText == "#1A2B3C", "回车 / 失焦：有效输入统一写成 #RRGGBB")
+    pm.hexText = "#12345"; pm.typed(pm.hexText); pm.commitText()
+    check(pm.hex == "#1A2B3C" && pm.hexText == "#1A2B3C" && picked.count == 2, "回车 / 失焦：无效输入恢复上次有效值，不应用")
+    let hueBefore = pm.hsv.h
+    pm.hexText = "#808080"; pm.typed(pm.hexText)
+    check(pm.hex == "#808080" && pm.hsv.h == hueBefore, "输入灰色：保留原来的色相，色相滑杆不跳")
+
+    print("== 取色器：删除按钮")
+    check(removingColor(["#111111"], at: 0) == nil, "这一组只剩一个颜色：不可删")
+    check(removingColor(["#111111", "#222222", "#333333"], at: 1) == ["#111111", "#333333"], "删第 2 个：其余颜色和顺序不变")
+    check(removingColor(["#111111", "#222222"], at: 5) == nil, "序号越界：不删")
+    let pc = ColorPopoverController()
+    var colorsUnderEdit = ["#AA0000", "#00AA00", "#0000AA"]
+    let editT = ColorEditTarget(group: \.leaveColors, index: 1)
+    var appliedHex: [String] = []
+    pc.attach(target: editT, initial: colorsUnderEdit[1], canDelete: colorsUnderEdit.count > 1,
+              apply: { appliedHex.append($0) },
+              remove: { if let rest = removingColor(colorsUnderEdit, at: 1) { colorsUnderEdit = rest } })
+    check(pc.editing == editT && pc.picker.canDelete, "三个颜色时打开：删除按钮可点")
+    pc.picker.setHue(0.5)        // 改了色还没到 0.12 秒的合并点，随即删除
+    pc.picker.onDelete?()        // 等同点删除按钮
+    check(colorsUnderEdit == ["#AA0000", "#0000AA"], "删除正在编辑的颜色：列表里去掉它，其余不动")
+    check(pc.editing == nil && appliedHex.isEmpty, "删除后弹出框关闭（没有正在编辑的色样），没应用的改色直接丢掉")
+    pc.picker.onDelete?()
+    check(colorsUnderEdit == ["#AA0000", "#0000AA"], "弹出框关了再触发删除：什么都不删")
+    var single = ["#ABCDEF"]
+    pc.attach(target: ColorEditTarget(group: \.arriveColors, index: 0), initial: single[0], canDelete: single.count > 1,
+              apply: { _ in }, remove: { if let rest = removingColor(single, at: 0) { single = rest } })
+    check(!pc.picker.canDelete, "这一组只剩一个颜色时打开：删除按钮灰掉")
+    pc.picker.onDelete?()
+    check(single == ["#ABCDEF"] && pc.editing != nil, "灰掉时点删除：不删、弹出框不关")
+    pc.close()
+
+    print("== 取色器：再点同一个色样就收起")
+    let swA = ColorEditTarget(group: \.leaveColors, index: 0), swB = ColorEditTarget(group: \.leaveColors, index: 1)
+    let swC = ColorEditTarget(group: \.arriveColors, index: 0)
+    let t0 = Date(timeIntervalSinceReferenceDate: 1000)
+    let byClick = ColorPopoverDismissal(target: swA, at: t0, click: 41)
+    check(colorPopoverShouldOpen(after: nil, target: swA, now: t0, click: 41), "没被收起过：点色样就打开")
+    check(!colorPopoverShouldOpen(after: byClick, target: swA, now: t0.addingTimeInterval(0.08), click: 41),
+          "开着时再点同一个色样：收起它的就是这次点击（事件编号相同）→ 不重开")
+    check(!colorPopoverShouldOpen(after: byClick, target: swA, now: t0.addingTimeInterval(0.9), click: 41),
+          "按住很久才松开（超过 0.3 秒）：事件编号相同，照样不重开")
+    check(colorPopoverShouldOpen(after: byClick, target: swA, now: t0.addingTimeInterval(0.2), click: 42),
+          "收起后很快又点了一次同一个色样（新的点击）→ 重新打开")
+    check(colorPopoverShouldOpen(after: byClick, target: swB, now: t0.addingTimeInterval(0.08), click: 41),
+          "开着时点同组另一个色样 → 从那个色样弹出")
+    check(colorPopoverShouldOpen(after: byClick, target: swC, now: t0.addingTimeInterval(0.08), click: 41),
+          "开着时点另一组的色样 → 从那个色样弹出")
+    let byTime = ColorPopoverDismissal(target: swA, at: t0, click: nil)
+    check(!colorPopoverShouldOpen(after: byTime, target: swA, now: t0.addingTimeInterval(0.25), click: 41),
+          "拿不到收起时的事件编号：0.3 秒内再点同一个色样 → 不重开")
+    check(colorPopoverShouldOpen(after: byTime, target: swA, now: t0.addingTimeInterval(0.35), click: 41),
+          "拿不到收起时的事件编号：超过 0.3 秒 → 重新打开")
+    check(!colorPopoverShouldOpen(after: byClick, target: swA, now: t0.addingTimeInterval(0.1), click: nil),
+          "拿不到这次点击的事件编号：按时间判，0.1 秒 → 不重开")
+
+    print("== 重置键鼠状态")
+    check(isResetHotkey(keyCode: 37, flags: [.control, .option, .command]), "被控方热键：⌃⌥⌘L")
+    check(isResetHotkey(keyCode: 37, flags: [.control, .option, .command, .shift]), "多按 Shift 也算（和主控的判定一致）")
+    check(!isResetHotkey(keyCode: 37, flags: [.control, .command]) && !isResetHotkey(keyCode: 38, flags: [.control, .option, .command]),
+          "少一个修饰键、或不是 L 键：不算")
+    check(StatusMenu.wantsMenu(type: .rightMouseUp, modifiers: []), "菜单栏图标：右键弹菜单")
+    check(StatusMenu.wantsMenu(type: .leftMouseUp, modifiers: [.control]), "菜单栏图标：Control + 左键弹菜单")
+    check(!StatusMenu.wantsMenu(type: .leftMouseUp, modifiers: []), "菜单栏图标：左键不弹菜单（打开主窗口）")
+    func resetModel(controller: Bool, status: LinkStatus) -> AppModel {
+        let me = DeviceIdentity(id: "me", name: "本机", isLaptop: true)
+        let m = AppModel(preview: me)
+        m.pairing = PairingRecord(peerID: "peer", peerName: "对方", peerIsLaptop: false,
+                                  keyBase64: Data(count: 32).base64EncodedString(), lastAddress: nil)
+        m.shared = SharedSettings(revision: 1, editor: "me", controllerID: controller ? "me" : "peer", ripple: .defaults)
+        m.linkStatus = status
+        return m
+    }
+    check(resetModel(controller: false, status: .connected).canResetInput, "本机是被控、已连接：显示「重置键鼠状态」")
+    check(!resetModel(controller: true, status: .connected).canResetInput, "本机是主控：不显示「重置键鼠状态」")
+    check(!resetModel(controller: false, status: .offline).canResetInput && !resetModel(controller: false, status: .searching).canResetInput,
+          "本机是被控但没连上：不显示")
+    check(!AppModel(preview: DeviceIdentity(id: "x", name: "x", isLaptop: true)).canResetInput, "未配对：不显示")
+    // 被控方点重置：发空载荷 leave（主控把光标放到它的主屏中心）并退出活动状态。
+    // 关掉波纹总开关再跑：退出活动状态时不隐藏光标、不出离开波纹，自测不碰屏幕上的光标
+    let savedRipple = rippleConfig
+    rippleConfig.enabled = false
+    let role = ControlledRole(peer: { nil }, map: { CrossingMap(views: [], localScreens: [], remoteScreens: []) })
+    var sentMsgs: [(Msg, Data)] = []
+    role.send = { t, d in sentMsgs.append((t, d)) }
+    check(!role.resetInputState("自测：本机不在被操作状态") && sentMsgs.isEmpty, "本机不在被操作状态时重置：什么都不发，只记日志")
+    role.active = true
+    let seqBefore = role.transitionSeq
+    check(role.resetInputState("自测：本机正在被操作"), "本机正在被操作时重置：执行")
+    check(sentMsgs.count == 1 && sentMsgs[0].0 == .leave && sentMsgs[0].1.isEmpty, "重置时发出的是空载荷的 leave")
+    check(!role.active && role.transitionSeq == seqBefore + 1, "重置后退出活动状态")
+    check(!role.resetInputState("自测：再点一次") && sentMsgs.count == 1, "已经交还后再点：不再发")
+    rippleConfig = savedRipple
 
     print("== 后备地址")
     if case .ipv6(let a) = NWEndpoint.Host("fe80::1234:5678:9abc:def0%lo0") {
@@ -674,6 +814,26 @@ func unitTests() {
     let rd5 = m.next(field: CGPoint(x: -400, y: 0), loc: CGPoint(x: 1304, y: 821), center: ctr)
     check(near(rd3, CGPoint(x: 20, y: 5)) && near(rd4, CGPoint(x: 24, y: 101)) && near(rd5, CGPoint(x: -400, y: 0)),
           "在飞的事件先到（用字段），warp 落地那一下离中心 104 点也算落地、剔除跳变，之后用字段")
+
+    print("== 切回本地的落点")
+    check(LocalLanding.forLeave(Data()) == .mainCenter, "空载荷 leave（被控那台重置了键鼠状态）→ 落主屏中心")
+    let backPayload = CrossPayload(screen: P.id, edge: .right, mm: 144)
+    check(LocalLanding.forLeave(try! JSONEncoder().encode(backPayload)) == .payload(backPayload), "带落点的 leave（光标推回来）→ 按落点")
+    check(LocalLanding.forLeave(Data("乱码".utf8)) == .exitPoint, "有内容却解不出的 leave → 落回跨出点")
+    let exitPt = CGPoint(x: 4479, y: 540)
+    let mainB = CGRect(x: 0, y: 0, width: 2560, height: 1440)   // 主屏 U2720QM 在全局坐标里的范围
+    let screensUP: [String: ScreenInfo] = [U.id: U, P.id: P]
+    let lc = LocalLanding.mainCenter.resolve(exitPoint: exitPt, mainBounds: mainB, screens: screensUP)
+    check(near(lc.point, CGPoint(x: 1280, y: 720)) && lc.how == "落在主屏中心", "重置 → 主屏中心 (1280, 720)，日志写「落在主屏中心」")
+    let lc2 = LocalLanding.mainCenter.resolve(exitPoint: exitPt, mainBounds: CGRect(x: 0, y: 0, width: 1512, height: 982), screens: [:])
+    check(near(lc2.point, CGPoint(x: 756, y: 491)), "主屏换成内建屏 → 落在它的中心 (756, 491)")
+    let le = LocalLanding.exitPoint.resolve(exitPoint: exitPt, mainBounds: mainB, screens: screensUP)
+    check(near(le.point, exitPt) && le.how == "回到跨出去时的位置", "安全兜底（角色停止、断线、重连）→ 落回跨出点")
+    let lp = LocalLanding.payload(backPayload).resolve(exitPoint: exitPt, mainBounds: mainB, screens: screensUP)
+    check(near(lp.point, CrossingMap.landing(on: P, edge: .right, mm: 144)), "带落点的正常推回 → 落在对方给的那块屏那条边上，不变")
+    let lgone = LocalLanding.payload(CrossPayload(screen: "拔掉了", edge: .left, mm: 10))
+        .resolve(exitPoint: exitPt, mainBounds: mainB, screens: screensUP)
+    check(near(lgone.point, exitPt), "落点那块屏已不在本机 → 落回跨出点")
 }
 
 // MARK: - loopback：单进程内配对 + Link

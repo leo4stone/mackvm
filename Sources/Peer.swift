@@ -16,11 +16,11 @@ enum Msg: UInt8 {
     case hello = 1
     case heartbeat = 2
     case enter = 3      // 主控 → 被控：JSON CrossPayload（落到被控哪块屏、哪条边、第几毫米）
-    case leave = 4      // 被控 → 主控：JSON CrossPayload（落到主控哪块屏、哪条边、第几毫米）；空表示回到跨出去的位置
+    case leave = 4      // 被控 → 主控：JSON CrossPayload（落到主控哪块屏、哪条边、第几毫米）；空表示重置键鼠状态，主控把光标放到它的主屏中心
     case move = 5       // 主控 → 被控：Int32 dx, Int32 dy
     case button = 6     // 主控 → 被控：UInt8 按键编号, UInt8 是否按下
     case event = 7      // 主控 → 被控：CGEvent 序列化数据（滚轮/键盘/修饰键/媒体键）
-    case release = 8    // 主控 → 被控：主控强制收回（紧急热键 / 菜单「收回光标」），被控退出活动状态
+    case release = 8    // 主控 → 被控：主控用热键 Ctrl+Option+Cmd+L 强制收回，被控退出活动状态
     case settings = 9   // 双向：共享设置（JSON，见 Settings.swift 的 SharedSettings）
     case unpair = 10    // 双向：对方解除了配对，收到的一方也清除配对
     case info = 11      // 双向：本机信息（JSON：设备 ID、设备名、是否笔记本），连上后各发一次

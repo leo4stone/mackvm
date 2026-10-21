@@ -2,8 +2,11 @@
 // 虚拟光标的移动连线穿过本机屏上某条相邻规则的蓝色边段（进入后 150ms 内不算；外侧边要在边上累计外推 15 像素，
 // 规则盖住自家相通段时一穿过就算）就交还主控，落点按毫米对应到主控那块屏那条边。
 // 连接由 Link 管，这里通过 AppModel 给的闭包拿发送通道和「当前生效的规则和屏幕」。
-// 光标从本机推回主控、或被主控紧急收回时，短暂隐藏本机光标，离开波纹播完再显示（见 CursorHider.swift）；
+// 光标从本机推回主控、被主控用热键收回、或在本机「重置键鼠状态」时，短暂隐藏本机光标，离开波纹播完再显示（见 CursorHider.swift）；
 // 断线、角色停止时不隐藏，并且立刻显示。
+// 重置键鼠状态（主界面底栏按钮、菜单栏菜单、本机键盘按 ⌃⌥⌘L）：光标在本机时发空载荷 leave（主控把光标放到它的主屏中心）再退出
+// 活动状态，和光标从边上推回主控走同一条路。本机键盘的热键用 NSEvent 全局 + 本地监听，只在被控角色运行期间装着；
+// 主控发来的注入按键里不会有这个热键（主控的截获层已经吞掉了），不用去重。
 
 import AppKit
 import Foundation
@@ -74,6 +77,12 @@ let modifierKeyFlags: [Int64: CGEventFlags] = [
 ]
 let modifierMask: CGEventFlags = [.maskShift, .maskControl, .maskAlternate, .maskCommand, .maskSecondaryFn]
 
+/// 被控方本机键盘上的「重置键鼠状态」热键：L 键（键码 37）同时按住 Control、Option、Command（多按 Shift 也算，和主控的判定一致）
+func isResetHotkey(keyCode: UInt16, flags: NSEvent.ModifierFlags) -> Bool {
+    let f = flags.intersection(.deviceIndependentFlagsMask)
+    return Int64(keyCode) == kKeycodeL && f.contains(.control) && f.contains(.option) && f.contains(.command)
+}
+
 final class ControlledRole {
     /// 当前连着的对方（通过了密钥校验）；nil 表示不在线
     let peer: () -> Peer?
@@ -95,10 +104,14 @@ final class ControlledRole {
     let hider: CursorHider
     let inputMonitor = LocalInputMonitor()
     var stopped = false
+    /// 发消息给主控：默认走当前连接；自测换成记录器，不经过网络
+    var send: (Msg, Data) -> Void
+    private var hotkeyMonitors: [Any] = []   // 本机键盘 ⌃⌥⌘L 的全局 + 本地监听
 
     init(peer: @escaping () -> Peer?, map: @escaping () -> CrossingMap) {
         self.peer = peer
         self.map = map
+        send = { t, d in peer()?.send(t, d) }
         hider = CursorHider(
             hideCursor: {
                 let e = CGDisplayHideCursor(CGMainDisplayID())
@@ -120,6 +133,7 @@ final class ControlledRole {
             log("被控方可以注入事件了（CGPreflightPostEventAccess = \(CGPreflightPostEventAccess())）")
             guard let self, !self.stopped else { return }
             self.inputMonitor.install()
+            self.installHotkey()
         }
     }
 
@@ -128,6 +142,49 @@ final class ControlledRole {
         if active { deactivate(reason: "被控角色停止", hideCursor: false) }
         hider.show(reason: .roleStop)
         inputMonitor.uninstall()
+        removeHotkey()
+    }
+
+    // MARK: 重置键鼠状态
+
+    /// 光标过到本机之后回不来时用：在本机被操作就交还主控（空载荷 = 主控把光标放到它的主屏中心）再退出活动状态，不弹确认。
+    /// 本机当前不在被操作状态时只记一行日志。返回是否真的交还了
+    @discardableResult
+    func resetInputState(_ reason: String) -> Bool {
+        guard active else {
+            log("\(reason)：本机当前不在被操作状态，不用重置")
+            return false
+        }
+        sendLeave(nil)
+        deactivate(reason: "\(reason)，交还主控")
+        return true
+    }
+
+    /// 本机键盘的 ⌃⌥⌘L：别的应用在前台时靠全局监听（需要辅助功能授权，start 里授权后才装），
+    /// 本应用在前台（主窗口是 key）时靠本地监听，并吞掉这次按键
+    private func installHotkey() {
+        guard hotkeyMonitors.isEmpty else { return }
+        let fire: (NSEvent) -> Bool = { [weak self] e in
+            guard isResetHotkey(keyCode: e.keyCode, flags: e.modifierFlags), !e.isARepeat else { return false }
+            self?.resetInputState("本机键盘按了重置热键 Ctrl+Option+Cmd+L")
+            return true
+        }
+        if let g = NSEvent.addGlobalMonitorForEvents(matching: .keyDown, handler: { e in _ = fire(e) }) {
+            hotkeyMonitors.append(g)
+        } else {
+            log("警告：重置热键的全局监听没装上，别的应用在前台时按 Ctrl+Option+Cmd+L 不起作用")
+        }
+        if let l = NSEvent.addLocalMonitorForEvents(matching: .keyDown, handler: { e in fire(e) ? nil : e }) {
+            hotkeyMonitors.append(l)
+        }
+        log("本机重置热键 Ctrl+Option+Cmd+L 的监听已装上")
+    }
+
+    private func removeHotkey() {
+        guard !hotkeyMonitors.isEmpty else { return }
+        for m in hotkeyMonitors { NSEvent.removeMonitor(m) }
+        hotkeyMonitors.removeAll()
+        log("本机重置热键的监听已拆除")
     }
 
     // MARK: 连接事件（AppModel 转过来）
@@ -157,7 +214,7 @@ final class ControlledRole {
             guard active else { return }
             inject(d)
         case .release:
-            if active { deactivate(reason: "主控用紧急热键收回") }
+            if active { deactivate(reason: "主控用热键 Ctrl+Option+Cmd+L 收回") }
         default:
             log("被控收到意外消息类型 \(t)，忽略")
         }
@@ -172,7 +229,7 @@ final class ControlledRole {
                                                                    mm: hit.remoteMM)) {
             d = j
         }
-        peer()?.send(.leave, d)
+        send(.leave, d)
     }
 
     func enter(_ payload: CrossPayload?) {
@@ -217,8 +274,8 @@ final class ControlledRole {
         }
     }
 
-    // 所有退出活动状态的路径（推回主控、主控紧急收回、断线、角色停止）都在这里，统一在当前虚拟光标位置播离开波纹。
-    // hideCursor：光标真正离开本机（推回主控、紧急收回）时为 true，短暂隐藏本机光标直到离开波纹播完；
+    // 所有退出活动状态的路径（推回主控、主控热键收回、本机重置键鼠状态、断线、角色停止）都在这里，统一在当前虚拟光标位置播离开波纹。
+    // hideCursor：光标真正离开本机（推回主控、主控热键收回、本机重置）时为 true，短暂隐藏本机光标直到离开波纹播完；
     // 断线、角色停止时为 false（这些情况要立刻显示光标）。
     func deactivate(reason: String, hideCursor: Bool = true) {
         transitionSeq += 1

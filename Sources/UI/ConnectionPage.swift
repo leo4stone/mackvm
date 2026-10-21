@@ -7,7 +7,8 @@
 //         同一台的两块屏挨上只吸附、不高亮。拔掉的屏留在原处、画成灰的、不能拖。
 //         「光标现在跨不到另一台」「对方离线」这类提示放在预览区下方，不弹窗。
 // 配色：本机浅蓝底蓝边蓝字，对方白底灰边灰字，不随输入角色交换。
-// 输入设备（主控）那台的屏上写「键盘鼠标接在这里」，另一台的屏上有「切换为输入设备」（即对调角色，先弹确认）。
+// 角色行：本机是主控时本机屏写「键盘鼠标接在这里」、对方屏写「受控设备」；本机是被控时本机屏写「由对方操作」、对方屏写「输入设备」。
+// 「切换为输入设备」（即对调角色，先弹确认）总在对方的主屏上（设计稿 06 主控视角、06b 被控视角）。
 
 import SwiftUI
 
@@ -262,7 +263,7 @@ private struct LayoutPreview: View {
 }
 
 /// 预览里的一块屏：设备名、显示器名（带位置后缀）、物理尺寸、本机 / 对方、键鼠接在哪；
-/// 不是输入设备的那台带「切换为输入设备」；右上角是拖动把手。卡片放不下全部内容时依次省掉次要的行
+/// 对方的主屏带「切换为输入设备」；右上角是拖动把手。卡片放不下全部内容时依次省掉次要的行
 private struct ScreenCard: View {
     @EnvironmentObject var model: AppModel
     let screen: PlacedScreen
@@ -282,8 +283,10 @@ private struct ScreenCard: View {
         let who = L.screenOwner(local: isLocal)
         let role = L.screenRole(local: isLocal, present: present, input: isInput)
         let ink = !present ? Theme.sub : (isLocal ? Theme.blue : Theme.sub)
-        let showSwap = present && !isInput
-        let swap = Button(L.swapButton) { model.dialog = .confirmSwap }
+        // 「切换为输入设备」只放在对方的一块屏上：对方的主屏，主屏没接着就放第一块接着的（设计稿 06 / 06b）
+        let swapScreen = (model.peerScreens.first { $0.isMain } ?? model.peerScreens.first)?.id
+        let showSwap = present && !isLocal && s.id == swapScreen
+        let swap = Button(L.swapButton(controller: model.isController)) { model.dialog = .confirmSwap }
             .buttonStyle(SwapButtonStyle())
             .fixedSize()
         ZStack(alignment: .topTrailing) {

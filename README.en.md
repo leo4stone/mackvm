@@ -14,7 +14,7 @@ in an afternoon of reading.
   Positions are matched by physical size (millimetres), independent of resolution and scaling. Each Mac can have any number of displays.
 - When the cursor crosses, a ripple plays where it left and where it arrived. The style is adjustable and synced between the Macs.
 - Pairing uses an 8-digit code on the local network; after that the Macs find each other and reconnect automatically.
-- Emergency hotkey Ctrl+Option+Cmd+L brings the cursor back to the controller at any time.
+- Reset keyboard & mouse state: press Ctrl+Option+Cmd+L at any time to hand the cursor and keyboard back to the controller. If the cursor gets stuck on the controlled Mac, you can also click "Reset Keyboard & Mouse State" in its main window.
 - The interface is available in Chinese and English: switch any time with the 中文 / EN toggle in the title bar or the menu bar menu.
   It takes effect immediately and follows the system language by default.
 
@@ -61,8 +61,9 @@ The screenshots below are exported from the design files and match the app. Devi
 
 ### The menu bar
 
-Once installed, MacKVM lives only in the menu bar; there is no Dock icon. The menu shows the connection status and lets you
-open the main window, bring the cursor back, switch language, and quit. Closing the main window keeps the app running in the
+Once installed, MacKVM lives only in the menu bar; there is no Dock icon. Click the icon to open the main window;
+right-click (or Control-click) it for the menu, which shows the connection status and lets you open the main window,
+reset keyboard & mouse state (on the controlled Mac only), switch language, and quit. Closing the main window keeps the app running in the
 background, and it starts at login. Choose "Quit MacKVM" to stop it.
 
 <img src="docs/images/01-menubar-en.png" width="640" alt="Menu bar menu">
@@ -110,12 +111,18 @@ arrangement in macOS.
 "Use as input device" on the other Mac's display swaps the roles: after confirming, connect the keyboard and mouse to
 that Mac. "Unpair" in the header returns both Macs to the unpaired state.
 
-### Crossing and bringing the cursor back
+### Crossing and resetting keyboard & mouse state
 
 - Push the cursor through a blue edge segment to switch to the other Mac; keyboard input follows. Push back to return.
 - The cursor does not cross while a mouse button is held down (dragging). This is intentional.
-- Press **Ctrl + Option + Cmd + L** at any time to bring the cursor back to the controller, for example when the other Mac freezes or drops off the network.
+- Press **Ctrl + Option + Cmd + L** at any time to reset keyboard & mouse state and hand the cursor and keyboard back to the controller, for example when the other Mac freezes or drops off the network.
+  If the cursor gets stuck on the controlled Mac, you can also click "Reset Keyboard & Mouse State" at the bottom of its main window, or press the hotkey on its own keyboard.
+  After a reset, the cursor returns to the center of the controller's main display (the one with the menu bar).
 - When the other Mac is offline you can still rearrange displays; the change syncs when it reconnects.
+
+The Devices page as seen on the controlled Mac: its own display is blue, and the reset button sits at the bottom right.
+
+<img src="docs/images/06b-layout-controlled-en.png" width="640" alt="Devices page on the controlled Mac">
 
 ### Cursor effects
 
@@ -125,6 +132,11 @@ to the other Mac. Move the mouse between the two cards to preview. Turning the m
 not affect keyboard and mouse sharing.
 
 <img src="docs/images/07-ripple-en.png" width="640" alt="Cursor effects">
+
+Click any colour swatch to open the picker; dragging the colour field or hue bar, or typing a HEX value, applies immediately.
+Click outside, or click the same swatch again, to close. The delete button in the popover removes that colour (each group keeps at least one); right-clicking a swatch also removes it, and "+" adds one.
+
+<img src="docs/images/07a-color-zh.png" width="640" alt="Ripple colour picker">
 
 ### Switching language
 

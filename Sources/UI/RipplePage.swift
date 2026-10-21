@@ -27,7 +27,7 @@ struct RipplePage: View {
                     .disabled(!r.enabled)
                 Text(L.rippleSwitchState(r.enabled)).font(.ui(12)).lh(12).foregroundStyle(Theme.sub)
                 KVMSwitch(on: r.enabled) { v in
-                    if !v { ColorPanelController.shared.close() }
+                    if !v { ColorPopoverController.shared.close() }
                     model.updateRipple { $0.enabled = v }
                 }
             }
@@ -174,11 +174,17 @@ final class RingHostView: NSView {
     }
 }
 
-/// 一组波纹颜色：标签 + 色点 + 「+」。点色点改色、点「+」加色（系统取色器），右键色点可删除（至少留一个）
+/// 一组波纹颜色：标签 + 色样 + 「+」。点色样从它弹出取色器（ColorPicker.swift）改这个颜色；
+/// 点「+」先追加一个颜色、再弹出取色器编辑新加的那个；右键色样、或取色器里的删除按钮可删除（至少留一个）
 private struct ColorGroup: View {
     @EnvironmentObject var model: AppModel
     let label: String
     let keyPath: WritableKeyPath<RippleConfig, [String]>
+    /// 刚点「+」追加的那个色样的序号：它出现后自动弹出取色器
+    @State private var openNew: Int?
+
+    /// 「+」追加的颜色：取一个这组里还没有的常用色，都有了就复制最后一个
+    static let addCandidates = ["#2869E8", "#9166D8", "#27A7A0", "#FFFFFF", "#000000"]
 
     var body: some View {
         let colors = model.ripple[keyPath: keyPath]
@@ -186,41 +192,20 @@ private struct ColorGroup: View {
             Text(label).font(.ui(13)).foregroundStyle(Theme.text).fixedSize()
             Spacer(minLength: 6)
             ForEach(Array(colors.enumerated()), id: \.offset) { i, hex in
-                Button {
-                    ColorPanelController.shared.edit(initial: hex) { new in
-                        model.updateRipple { r in
-                            if i < r[keyPath: keyPath].count { r[keyPath: keyPath][i] = new }
-                        }
-                    }
-                } label: {
-                    swatchBox(fill: .white) { Circle().fill(Color(cgColor: cgColor(hex: hex))).frame(width: 12, height: 12) }
-                }
-                .buttonStyle(.plain)
-                .help(L.colorSwatchHelp)
-                .contextMenu {
-                    Button(L.colorDelete) {
-                        model.updateRipple { r in
-                            if r[keyPath: keyPath].count > 1, i < r[keyPath: keyPath].count {
-                                r[keyPath: keyPath].remove(at: i)
-                            }
-                        }
-                    }
-                    .disabled(colors.count <= 1)
-                }
+                ColorSwatch(keyPath: keyPath, index: i, hex: hex, canDelete: colors.count > 1,
+                            autoOpen: openNew == i, autoOpened: { openNew = nil })
             }
             if colors.count < RippleConfig.maxColors {
                 Button {
-                    var added: Int?   // 第一次选色时追加，之后继续选色就改这一个
-                    ColorPanelController.shared.edit(initial: colors.last ?? RippleConfig.defaultColors[0]) { new in
-                        model.updateRipple { r in
-                            if let i = added, i < r[keyPath: keyPath].count {
-                                r[keyPath: keyPath][i] = new
-                            } else if r[keyPath: keyPath].count < RippleConfig.maxColors {
-                                r[keyPath: keyPath].append(new)
-                                added = r[keyPath: keyPath].count - 1
-                            }
+                    let new = Self.addCandidates.first { !colors.contains($0) } ?? colors.last ?? Self.addCandidates[0]
+                    var added: Int?
+                    model.updateRipple { r in
+                        if r[keyPath: keyPath].count < RippleConfig.maxColors {
+                            r[keyPath: keyPath].append(new)
+                            added = r[keyPath: keyPath].count - 1
                         }
                     }
+                    openNew = added
                 } label: {
                     swatchBox(fill: Theme.fieldBG) {
                         Image(systemName: "plus").font(.system(size: 9, weight: .semibold)).foregroundStyle(Theme.sub)
@@ -231,14 +216,84 @@ private struct ColorGroup: View {
             }
         }
     }
+}
 
-    private func swatchBox<C: View>(fill: Color, @ViewBuilder _ content: () -> C) -> some View {
-        content()
-            .frame(width: 18, height: 20)
-            .background(RoundedRectangle(cornerRadius: 4).fill(fill))
-            .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.border, lineWidth: 1))
-            .contentShape(Rectangle())
+/// 一个色样：白底小方块里一个色点；正在取色器里编辑时外面加一圈蓝框
+private struct ColorSwatch: View {
+    @EnvironmentObject var model: AppModel
+    @ObservedObject private var picker = ColorPopoverController.shared
+    let keyPath: WritableKeyPath<RippleConfig, [String]>
+    let index: Int
+    let hex: String
+    let canDelete: Bool
+    let autoOpen: Bool
+    let autoOpened: () -> Void
+    @State private var anchor = ColorAnchorBox()
+
+    private var target: ColorEditTarget { ColorEditTarget(group: keyPath, index: index) }
+
+    var body: some View {
+        Button { open() } label: {
+            // 色点带一圈浅灰描边：白色的色点在白底上也看得见（设计稿 07）
+            swatchBox(fill: .white) {
+                Circle().fill(Color(cgColor: cgColor(hex: hex)))
+                    .overlay(Circle().strokeBorder(Color(hex: 0xB4BCC8), lineWidth: 1))
+                    .frame(width: 12, height: 12)
+            }
+                .overlay {
+                    if picker.editing == target {
+                        RoundedRectangle(cornerRadius: 5).strokeBorder(Theme.blue, lineWidth: 2).padding(-1.5)
+                    }
+                }
+        }
+        .buttonStyle(.plain)
+        .background(ColorAnchor(box: anchor, name: (keyPath == \RippleConfig.leaveColors ? "leave-" : "arrive-") + "\(index)"))
+        .help(L.colorSwatchHelp)
+        .contextMenu {
+            Button(L.colorDelete) {
+                // 删的是正在编辑的这组里的颜色：先收起取色器，免得它接着改到挪了位置的另一个颜色
+                if picker.editing?.group == keyPath { picker.close() }
+                let kp = keyPath, i = index
+                model.updateRipple { r in
+                    if let rest = removingColor(r[keyPath: kp], at: i) { r[keyPath: kp] = rest }
+                }
+            }
+            .disabled(!canDelete)
+        }
+        .onAppear {
+            guard autoOpen else { return }
+            autoOpened()
+            open(retries: 5)
+        }
     }
+
+    /// 从这个色样弹出取色器。刚追加的色样可能还没进窗口，稍等再试几次
+    private func open(retries: Int = 0) {
+        guard let v = anchor.view, v.window != nil else {
+            if retries > 0 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { open(retries: retries - 1) }
+            }
+            return
+        }
+        let kp = keyPath, i = index, m = model
+        picker.show(relativeTo: v, target: target, initial: hex, canDelete: canDelete, apply: { new in
+            m.updateRipple { r in
+                if i < r[keyPath: kp].count { r[keyPath: kp][i] = new }
+            }
+        }, remove: {
+            m.updateRipple { r in
+                if let rest = removingColor(r[keyPath: kp], at: i) { r[keyPath: kp] = rest }
+            }
+        })
+    }
+}
+
+private func swatchBox<C: View>(fill: Color, @ViewBuilder _ content: () -> C) -> some View {
+    content()
+        .frame(width: 18, height: 20)
+        .background(RoundedRectangle(cornerRadius: 4).fill(fill))
+        .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.border, lineWidth: 1))
+        .contentShape(Rectangle())
 }
 
 /// 步进输入框：可以直接输数字（回车或失焦生效），也可以点右侧的 ⌃ / ⌄ 按步进加减

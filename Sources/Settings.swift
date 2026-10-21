@@ -61,11 +61,12 @@ struct RippleConfig: Codable, Equatable {
     var minDuration: Double = 1.0       // 进入波纹：至少持续
     var idleStop: Double = 0.5          // 进入波纹：停下判定时间
     var maxDuration: Double = 5.0       // 进入波纹：最长持续
-    var leaveColors: [String] = RippleConfig.defaultColors   // 离开波纹的颜色（#RRGGBB），出环时按顺序循环取色
-    var arriveColors: [String] = RippleConfig.defaultColors  // 进入波纹的颜色
+    var leaveColors: [String] = RippleConfig.defaultLeaveColors    // 离开波纹的颜色（#RRGGBB），出环时按顺序循环取色
+    var arriveColors: [String] = RippleConfig.defaultArriveColors  // 进入波纹的颜色
 
-    /// 设计稿上的蓝、紫、青
-    static let defaultColors = ["#2869E8", "#9166D8", "#27A7A0"]
+    /// 默认颜色（设计稿 v7）：离开波纹先白后黑，进入波纹先黑后白。只影响新装和「恢复默认值」，已同步的配置不动
+    static let defaultLeaveColors = ["#FFFFFF", "#000000"]
+    static let defaultArriveColors = ["#000000", "#FFFFFF"]
     /// 每组最多几个颜色（卡片里放得下的数量）；最少一个
     static let maxColors = 5
 
@@ -101,8 +102,8 @@ struct RippleConfig: Codable, Equatable {
             c[keyPath: kp] = min(max(v, spec.range.lowerBound), spec.range.upperBound)
         }
         if c.maxDuration < c.minDuration { c.maxDuration = c.minDuration }
-        c.leaveColors = RippleConfig.cleanColors(c.leaveColors)
-        c.arriveColors = RippleConfig.cleanColors(c.arriveColors)
+        c.leaveColors = RippleConfig.cleanColors(c.leaveColors, fallback: RippleConfig.defaultLeaveColors)
+        c.arriveColors = RippleConfig.cleanColors(c.arriveColors, fallback: RippleConfig.defaultArriveColors)
         return c
     }
 
@@ -131,27 +132,33 @@ struct RippleConfig: Codable, Equatable {
 // MARK: - 颜色
 
 extension RippleConfig {
-    /// 只留合法的 #RRGGBB（统一成大写），最多 maxColors 个；一个都不剩就回到默认三色
-    static func cleanColors(_ list: [String]) -> [String] {
+    /// 只留合法的 #RRGGBB（统一成大写），最多 maxColors 个；一个都不剩就回到这一组的默认颜色
+    static func cleanColors(_ list: [String], fallback: [String]) -> [String] {
         let ok = list.compactMap { s -> String? in
             guard let rgb = parseHexColor(s) else { return nil }
             return hexColorString(rgb)
         }
-        return ok.isEmpty ? defaultColors : Array(ok.prefix(maxColors))
+        return ok.isEmpty ? fallback : Array(ok.prefix(maxColors))
     }
 }
 
 /// 第 index 个环（从 0 起）用的颜色：按列表顺序循环
 func cycledColor(_ colors: [String], _ index: Int) -> String {
-    guard !colors.isEmpty else { return RippleConfig.defaultColors[0] }
+    guard !colors.isEmpty else { return RippleConfig.defaultArriveColors[0] }
     return colors[((index % colors.count) + colors.count) % colors.count]
+}
+
+/// 用户输入的 HEX 是否有效：六位十六进制数字，带不带 # 都认（前后空格忽略）；有效时返回统一成大写的 #RRGGBB
+func normalizedHexInput(_ s: String) -> String? {
+    var h = Substring(s.trimmingCharacters(in: .whitespaces))
+    if h.hasPrefix("#") { h = h.dropFirst() }
+    guard h.count == 6, h.allSatisfy({ $0.isHexDigit && $0.isASCII }) else { return nil }
+    return "#" + h.uppercased()
 }
 
 /// "#RRGGBB" → 0~1 的 r、g、b
 func parseHexColor(_ s: String) -> (Double, Double, Double)? {
-    var h = s.trimmingCharacters(in: .whitespaces)
-    if h.hasPrefix("#") { h.removeFirst() }
-    guard h.count == 6, let v = UInt32(h, radix: 16) else { return nil }
+    guard let h = normalizedHexInput(s), let v = UInt32(h.dropFirst(), radix: 16) else { return nil }
     return (Double((v >> 16) & 0xff) / 255, Double((v >> 8) & 0xff) / 255, Double(v & 0xff) / 255)
 }
 

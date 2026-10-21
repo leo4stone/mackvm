@@ -3,7 +3,7 @@
 //     会记进本机状态文件（不在两台之间同步），界面立即刷新，不用重启。
 //   - 默认语言跟系统：系统首选语言是 zh 开头就中文，否则英文；用户手动切过之后按记住的来。
 //   - 界面代码一律通过 L.xxx 取文案：不带参数的是计算属性，要拼名字、数字的是函数。
-//   - 英文以设计稿 design/v6 的英文页为准；设计稿没画到的（错误提示、少见状态）按同样语气补写。
+//   - 英文以设计稿 design/v7 的英文页为准；设计稿没画到的（错误提示、少见状态）按同样语气补写。
 //   - 日志（log()）不走这里，保持中文。显示器名字用系统给的，不翻译；只有本程序自己起的「内建屏幕」「显示器」翻译。
 
 import Foundation
@@ -51,12 +51,18 @@ enum L {
     static let languageEn = "EN"
     static var languageHelp: String { tr("切换界面语言", "Change the interface language") }
     static var footerBackground: String { tr("关闭窗口后仍在后台运行 · 开机自动启动", "Runs in the background · Starts at login") }
-    static var footerHotkey: String { tr("紧急收回光标  ⌃ ⌥ ⌘ L", "Bring cursor back  ⌃ ⌥ ⌘ L") }
+    /// 「重置键鼠状态」按钮（底栏右侧、菜单栏菜单里各一个，只在本机是被控且已连接时显示）
+    static var resetInput: String { tr("重置键鼠状态", "Reset Keyboard & Mouse State") }
+    /// 按钮右侧的热键提示，两种语言一样
+    static let resetHotkey = "⌃ ⌥ ⌘ L"
+    static var resetInputHelp: String {
+        tr("光标过到这台之后回不来时点这里：光标和键盘回到主控那台",
+           "Use this if the cursor gets stuck on this Mac: the cursor and keyboard go back to the controlling Mac.")
+    }
 
     // MARK: 菜单栏菜单
 
-    static var menuOpen: String { tr("打开 MacKVM…", "Open MacKVM…") }
-    static var menuRelease: String { tr("收回光标", "Bring cursor back") }
+    static var menuOpen: String { tr("打开 MacKVM 主界面", "Open MacKVM Main Window") }
     static var menuLanguage: String { tr("语言", "Language") }
     static var menuQuit: String { tr("退出 MacKVM", "Quit MacKVM") }
     static var menuUnpaired: String { tr("尚未配对", "Not paired yet") }
@@ -185,15 +191,19 @@ enum L {
         tr("还没读到显示器信息，连上对方后会显示。", "No display information yet. It appears once the Macs connect.")
     }
     static var noticeNoCrossing: String {
-        tr("光标现在跨不到另一台。需要时按 Ctrl + Option + Cmd + L 紧急收回光标。",
-           "The cursor can’t reach the other Mac right now. Press Ctrl + Option + Cmd + L to bring it back.")
+        tr("光标现在跨不到另一台。需要时按 Ctrl + Option + Cmd + L 重置键鼠状态。",
+           "The cursor can’t reach the other Mac right now. Press Ctrl + Option + Cmd + L to reset keyboard & mouse state.")
     }
     static var noticeOffline: String {
         tr("对方离线：使用上次连接信息，重连后同步。",
            "The other Mac is offline: showing the last known layout. Changes sync when it reconnects.")
     }
     static var dragHandleHelp: String { tr("拖动摆放这块屏幕", "Drag to arrange this display") }
-    static var swapButton: String { tr("切换为输入设备", "Use as input device") }
+    /// 对方屏上的「切换为输入设备」（对调角色）。英文按设计稿分两种：本机是主控时在对方（被控）屏上写「Use as input device」，
+    /// 本机是被控时在对方（主控）屏上写「Use This Mac for Input」
+    static func swapButton(controller: Bool) -> String {
+        tr("切换为输入设备", controller ? "Use as input device" : "Use This Mac for Input")
+    }
 
     /// 屏幕卡片的尺寸行：「599 × 340 mm · 27 英寸 · 主屏」
     static func screenSize(mmW: Double, mmH: Double, inches: Int, main: Bool, estimated: Bool) -> String {
@@ -202,11 +212,20 @@ enum L {
     }
     /// 屏幕卡片上「本机 / 对方」
     static func screenOwner(local: Bool) -> String { local ? tr("本机", "This Mac") : tr("对方", "Other Mac") }
-    /// 屏幕卡片的角色行：「本机 · 键盘鼠标接在这里」「对方 · 受控设备」「对方 · 未接上」
+    /// 屏幕卡片的角色行（设计稿 06 主控视角、06b 被控视角）：
+    ///   本机是主控：「本机 · 键盘鼠标接在这里」「对方 · 受控设备」；本机是被控：「本机 · 由对方操作」「对方 · 输入设备」；
+    ///   拔掉的屏：「本机 / 对方 · 未接上」
     static func screenRole(local: Bool, present: Bool, input: Bool) -> String {
         let who = screenOwner(local: local)
         guard present else { return who + " · " + tr("未接上", "Unplugged") }
-        return who + " · " + (input ? tr("键盘鼠标接在这里", "Keyboard and mouse connected") : tr("受控设备", "Controlled"))
+        let what: String
+        switch (local, input) {
+        case (true, true): what = tr("键盘鼠标接在这里", "Keyboard and mouse connected")
+        case (false, true): what = tr("输入设备", "Input device")
+        case (true, false): what = tr("由对方操作", "Controlled by other Mac")
+        case (false, false): what = tr("受控设备", "Controlled")
+        }
+        return who + " · " + what
     }
 
     // MARK: 显示器名字与位置后缀
@@ -275,6 +294,8 @@ enum L {
     static var colorSwatchHelp: String { tr("点按修改颜色；右键可删除", "Click to change the color; right-click to remove it") }
     static var colorDelete: String { tr("删除这个颜色", "Remove this color") }
     static var colorAdd: String { tr("添加颜色", "Add a color") }
+    /// 取色器里 HEX 输入框的标签，两种语言一样
+    static let colorHex = "HEX"
     /// 步进框里的秒数：「0.4 秒」「0.4 s」
     static func secondsValue(_ v: String) -> String { tr("\(v) 秒", "\(v) s") }
 

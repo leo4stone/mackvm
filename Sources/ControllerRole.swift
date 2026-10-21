@@ -1,6 +1,8 @@
 // 主控角色（键鼠接在本机）：截获本机全部输入，光标移动的连线穿过某条相邻规则的蓝色边段（可用区域的边，见 CrossingMap.hit）时，
 // 把输入转发给对方；对方把光标从它那边的规则边段推回来时切回本地，落点按毫米对应到本机那块屏那条边。
-// 紧急热键 Ctrl+Option+Cmd+L 和菜单「收回光标」强制回本地。
+// 热键 Ctrl+Option+Cmd+L 强制回本地（在截获回调里处理）；被控那台的「重置键鼠状态」见 ControlledRole。
+// 切回本地的落点分三种（见 LocalLanding）：对方推回来时按它给的毫米落点；本机热键和对方发来空载荷 leave（被控那台
+// 点了重置按钮或按了热键）都是「重置」，落到主屏（菜单栏所在那块）中心；角色停止、对方断线或重连的安全兜底落回跨出去时的点。
 // 远端期间本机光标藏起来、停在主屏中心；发给对方的位移取事件的位移字段（见 remoteMove）。
 // 连接由 Link 管，这里通过 AppModel 给的闭包拿「对方在不在线」「当前生效的规则和屏幕」和发送通道。
 // 角色可以在运行中开关（对调角色、解除配对），stop() 会把截获通道整个拆掉。
@@ -93,6 +95,41 @@ struct RemoteDelta {
     }
 }
 
+// MARK: - 切回本地的落点（纯逻辑，自测直接断言）
+
+/// 切回本地时光标落在哪
+enum LocalLanding: Equatable {
+    /// 对方推回来时给的落点（本机哪块屏、哪条边、第几毫米）；那块屏已不在就落回跨出点
+    case payload(CrossPayload)
+    /// 跨出去时的点：角色停止、对方断线或重连的安全兜底
+    case exitPoint
+    /// 主屏（CGMainDisplayID，菜单栏所在那块）中心：重置键鼠状态（本机热键、对方发来空载荷 leave）
+    case mainCenter
+
+    /// 对方发来的 leave 该落在哪：空载荷是被控那台的「重置键鼠状态」→ 主屏中心；
+    /// 解得出落点 → 按落点；有内容却解不出（不该发生）→ 落回跨出点
+    static func forLeave(_ d: Data) -> LocalLanding {
+        if d.isEmpty { return .mainCenter }
+        if let p = try? JSONDecoder().decode(CrossPayload.self, from: d) { return .payload(p) }
+        return .exitPoint
+    }
+
+    /// 算出落点和日志里的说法。mainBounds 是主屏在全局坐标里的范围（CGDisplayBounds(CGMainDisplayID())）
+    func resolve(exitPoint: CGPoint, mainBounds: CGRect, screens: [String: ScreenInfo]) -> (point: CGPoint, how: String) {
+        switch self {
+        case .payload(let p):
+            if let s = screens[p.screen] {
+                return (CrossingMap.landing(on: s, edge: p.edge, mm: p.mm), "落在「\(s.name)」\(p.edge.edgeLabel) \(fmt(p.mm)) 毫米处")
+            }
+            return (exitPoint, "对方给的落点那块屏不在本机，回到跨出去时的位置")
+        case .exitPoint:
+            return (exitPoint, "回到跨出去时的位置")
+        case .mainCenter:
+            return (CGPoint(x: mainBounds.midX, y: mainBounds.midY), "落在主屏中心")
+        }
+    }
+}
+
 final class ControllerRole {
     /// 当前连着的对方（通过了密钥校验）；nil 表示不在线
     let peer: () -> Peer?
@@ -134,7 +171,7 @@ final class ControllerRole {
         guard !stopped else { return }
         if remote {
             peer()?.send(.release)
-            goLocal(nil, reason: "主控角色停止")
+            goLocal(.exitPoint, reason: "主控角色停止")
         }
         stopped = true
         if let tap {
@@ -151,13 +188,13 @@ final class ControllerRole {
     // MARK: 连接事件（AppModel 转过来）
 
     func peerOnline(replaced: Bool) {
-        if remote { goLocal(nil, reason: "对方重新连上（安全兜底）") }
+        if remote { goLocal(.exitPoint, reason: "对方重新连上（安全兜底）") }
         let n = map().activeViews.count
         log(n > 0 ? "对方在线：\(n) 条相邻规则生效，光标从规则边段推出即可切到对方" : "对方在线，但没有生效的相邻规则：光标现在跨不到另一台")
     }
 
     func peerOffline() {
-        if remote { goLocal(nil, reason: "对方断线（安全兜底）") }
+        if remote { goLocal(.exitPoint, reason: "对方断线（安全兜底）") }
     }
 
     func message(_ t: Msg, _ d: Data) {
@@ -167,19 +204,10 @@ final class ControllerRole {
                 log("收到 leave，但当前已是本地状态，忽略")
                 return
             }
-            goLocal(try? JSONDecoder().decode(CrossPayload.self, from: d), reason: "对方发来 leave")
+            let landing = LocalLanding.forLeave(d)
+            goLocal(landing, reason: landing == .mainCenter ? "对方发来空载荷 leave：被控那台重置了键鼠状态" : "对方发来 leave")
         default:
             log("主控收到意外消息类型 \(t)，忽略")
-        }
-    }
-
-    /// 菜单「收回光标」：和紧急热键一样
-    func releaseCursor(_ reason: String) {
-        if remote {
-            peer()?.send(.release)
-            goLocal(nil, reason: reason)
-        } else {
-            log("\(reason)：当前已是本地状态")
         }
     }
 
@@ -227,7 +255,7 @@ final class ControllerRole {
             if f.contains(.maskControl), f.contains(.maskAlternate), f.contains(.maskCommand) {
                 if remote {
                     peer()?.send(.release)
-                    goLocal(nil, reason: "紧急热键 Ctrl+Option+Cmd+L")
+                    goLocal(.mainCenter, reason: "紧急热键 Ctrl+Option+Cmd+L")
                     return nil
                 }
                 log("紧急热键 Ctrl+Option+Cmd+L：当前已是本地状态")
@@ -346,19 +374,27 @@ final class ControllerRole {
         log("切到远端：从规则 \(hit.ruleID.prefix(8)) 的\(hit.localEdge.edgeLabel)段推出，跨出点 (\(Int(hit.crossPoint.x)), \(Int(hit.crossPoint.y)))，本机边上 \(fmt(hit.localMM)) 毫米 → 对方屏\(hit.remoteEdge.edgeLabel) \(fmt(hit.remoteMM)) 毫米")
     }
 
-    /// 切回本地（紧急热键、菜单收回、对方发 leave、断线、角色停止都走这里）：warp 到落点 → 显示光标。
-    /// payload 是对方给的落点（本机哪块屏、哪条边、第几毫米）；没有、或那块屏已不在，就回到跨出去时的点
-    func goLocal(_ payload: CrossPayload?, reason: String) {
-        remote = false
-        motion.reset()
-        var p = exitPoint
-        var how = "回到跨出去时的位置"
-        if let payload, let s = map().local[payload.screen] {
-            p = CrossingMap.landing(on: s, edge: payload.edge, mm: payload.mm)
-            how = "落在「\(s.name)」\(payload.edge.edgeLabel) \(fmt(payload.mm)) 毫米处"
+    /// 切回本地时把光标放到落点，并让系统 HID 层记的鼠标位置跟着对齐。
+    /// 远端期间事件都被吞掉，HID 层自己记的鼠标位置早已跟着鼠标走远了（贴在跨出去那条边上）；warp 真的移动了光标时
+    /// HID 层的位置会一起同步（下一个事件的位移字段里能看到跳变量）；但落点恰好是光标当前画着的位置时（重置键鼠状态：
+    /// 远端期间光标一直停在主屏中心，落点也是主屏中心）warp 等于没动、HID 层不同步，之后第一个真实移动事件就把光标画到边上去。
+    /// 所以落点和当前位置重合时先 warp 到旁边 1 点再 warp 回落点。CGAssociateMouseAndMouseCursorPosition 只对前台应用生效，这里用不上。
+    func warpAndSync(_ p: CGPoint) {
+        if let cur = CGEvent(source: nil)?.location, abs(cur.x - p.x) < 0.5, abs(cur.y - p.y) < 0.5 {
+            let detour = CGPoint(x: p.x + (p.x > 1 ? -1 : 1), y: p.y)
+            let de = CGWarpMouseCursorPosition(detour)
+            if de != .success { log("警告：切回本地时移动光标（绕一下）失败，错误码 \(de.rawValue)") }
         }
         let we = CGWarpMouseCursorPosition(p)
         if we != .success { log("警告：切回本地时移动光标失败，错误码 \(we.rawValue)") }
+    }
+
+    /// 切回本地（热键、对方发 leave、断线、角色停止都走这里）：warp 到落点 → 显示光标。落点怎么定见 LocalLanding
+    func goLocal(_ landing: LocalLanding, reason: String) {
+        remote = false
+        motion.reset()
+        let (p, how) = landing.resolve(exitPoint: exitPoint, mainBounds: CGDisplayBounds(CGMainDisplayID()), screens: map().local)
+        warpAndSync(p)
         lastLoc = p
         showCursor()
         transitionSeq += 1

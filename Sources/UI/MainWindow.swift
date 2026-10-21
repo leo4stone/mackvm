@@ -1,7 +1,8 @@
 // 主窗口：900×620 的单窗口，SwiftUI 画全部内容（标题栏底色和右侧的「设备连接 / 光标特效」切换、「中文 / EN」语言开关、
 // 各页、底栏、弹窗遮罩）。语言一变整棵视图按新语言重建（RootView 上的 .id），文案见 Strings.swift。
 // 进程是 .accessory，打开窗口时临时激活本应用把窗口带到前台；关掉窗口只是隐藏，进程照常运行。
-// 关窗口时顺手取消正在进行的配对流程（停止广播 / 停止查找），免得在看不见的地方一直广播。
+// 关窗口时顺手取消正在进行的配对流程（停止广播 / 停止查找），免得在看不见的地方一直广播；波纹颜色的取色器弹出框一起收起。
+// 底栏左边是「关闭窗口后仍在后台运行 · 开机自动启动」，右边的「重置键鼠状态 ⌃⌥⌘L」按钮只在本机是被控且已连接时显示。
 
 import AppKit
 import SwiftUI
@@ -56,7 +57,7 @@ final class MainWindowController: NSObject, NSWindowDelegate {
     }
 
     func windowWillClose(_ notification: Notification) {
-        ColorPanelController.shared.close()
+        ColorPopoverController.shared.close()
         model.ripplePreview.pointerExited()
         switch model.dialog {
         case .invite, .codeRenewed:
@@ -185,15 +186,40 @@ struct LanguageToggle: View {
 }
 
 struct Footer: View {
+    @EnvironmentObject var model: AppModel
+
     var body: some View {
         HStack {
             Text(L.footerBackground).font(.ui(11)).foregroundStyle(Theme.sub)
             Spacer()
-            Text(L.footerHotkey).font(.ui(12, .medium)).foregroundStyle(Theme.sub)
+            if model.canResetInput {
+                Button { model.resetInputState(from: "主界面底栏") } label: {
+                    HStack(spacing: 12) {
+                        Text(L.resetInput).font(.ui(12, .medium))
+                        Text(L.resetHotkey).font(.ui(11, .medium))
+                    }
+                }
+                .buttonStyle(ResetButtonStyle())
+                .help(L.resetInputHelp)
+            }
         }
         .padding(.horizontal, 24)
         .frame(height: 47.5)
         .overlay(alignment: .top) { Rectangle().fill(Theme.border).frame(height: 1) }
+    }
+}
+
+/// 「重置键鼠状态」按钮：和 06 页本机显示器卡片同样的浅蓝底、蓝描边、蓝字，32 点高
+struct ResetButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(Theme.blue)
+            .padding(.horizontal, 10)
+            .frame(height: 32)
+            .background(RoundedRectangle(cornerRadius: 7).fill(Theme.localFill))
+            .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(Theme.localStroke, lineWidth: 1))
+            .opacity(configuration.isPressed ? 0.75 : 1)
+            .contentShape(RoundedRectangle(cornerRadius: 7))
     }
 }
 

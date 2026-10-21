@@ -2,7 +2,8 @@
 // 把各个页面和弹窗用 NSHostingView 画到 2x 位图（窗口从不显示到屏幕上，进程激活策略是 prohibited），
 // 存成 PNG；有对应设计稿的，再拼一张「左设计稿 / 右实现」的对照图。
 // 每张页面都出中文、英文两份（英文的文件名带 -en，语言直接设 LanguageSettings，不经过点击）；
-// 另外把菜单栏菜单（01）和 08 的弹窗卡片合集各拼一张，和设计稿对照。
+// 另外把菜单栏菜单（01）和 08 的弹窗卡片合集各拼一张，和设计稿对照；07 页再出一张取色器弹出状态（07a），和设计稿对照。
+// 06、07 页各出主控视角（底栏没有「重置键鼠状态」按钮）和被控视角（有按钮）两种，按底栏像素检查按钮在不在。
 // 用法：mackvm-render <输出目录> <设计稿目录>
 
 import AppKit
@@ -110,7 +111,8 @@ let shots: [Shot] = [
     },
     Shot(name: "06-layout", design: "R9pul", designEN: "M2QCS") { n in layoutModel(n) },
     Shot(name: "06-default-layout", design: nil, designEN: nil) { n in layoutModel(n, bookAt: CGPoint(x: 1106, y: 46.5)) },
-    Shot(name: "06-controlled-view", design: nil, designEN: nil) { n in layoutModel(n, asStudio: false) },
+    // 被控视角（设计稿 06b）：本机是 MacBook，对方两块 DELL 是输入设备，底栏右侧有「重置键鼠状态」
+    Shot(name: "06-controlled-view", design: "b4iwvq", designEN: "n04MZ") { n in layoutModel(n, asStudio: false) },
     Shot(name: "06-two-seams", design: nil, designEN: nil) { n in layoutModel(n, bookAt: CGPoint(x: 599, y: 288)) },
     Shot(name: "06-no-crossing", design: nil, designEN: nil) { n in layoutModel(n, bookAt: CGPoint(x: 1106 + 60, y: 46.5)) },
     Shot(name: "06-unplugged", design: nil, designEN: nil) { n in
@@ -141,6 +143,12 @@ let shots: [Shot] = [
     },
     Shot(name: "07-ripple", design: "G2wLHj", designEN: "x9opB") { n in
         let m = pairedModel(me: n.book, peer: n.mini, controller: true)
+        m.tab = .ripple
+        return m
+    },
+    // 被控视角的 07 页：设计稿 07（G2wLHj / x9opB）底栏画着「重置键鼠状态」按钮，和这张的底栏一致，也拼一张对照
+    Shot(name: "07-ripple-controlled", design: "G2wLHj", designEN: "x9opB") { n in
+        let m = pairedModel(me: n.mini, peer: n.book, controller: false)
         m.tab = .ripple
         return m
     },
@@ -228,9 +236,9 @@ func check(_ ok: Bool, _ what: String) {
     if ok { print("  通过  \(what)") } else { renderFailures += 1; print("  失败  \(what)") }
 }
 
-/// 设计稿图：优先 v6 的 2 倍图，其次 v6 的 1 倍图，再往前找旧版本
+/// 设计稿图：优先 v7 的 2 倍图，其次 v7 的 1 倍图，再往前找旧版本
 func designImage(_ d: String) -> NSImage? {
-    for path in ["v6/2x", "v6", "v5/2x", "v4/2x", "v3/2x"] {
+    for path in ["v7/2x", "v7", "v6/2x", "v6", "v5/2x", "v4/2x", "v3/2x"] {
         if let img = NSImage(contentsOfFile: "\(designDir)/\(path)/\(d).png") { return img }
     }
     return nil
@@ -289,6 +297,21 @@ func hitChain(_ root: NSView, _ p: NSPoint) -> [String] {
     return chain
 }
 
+/// 底栏右侧「重置键鼠状态」按钮里的一点（按钮右边离窗口右边 24 点、在 47.5 点高的底栏里垂直居中）是不是按钮的浅蓝底
+func footerHasResetButton(_ rep: NSBitmapImageRep) -> Bool {
+    let x = Int((kWindowSize.width - 24 - 6) * 2), y = Int((kWindowSize.height - 47.5 / 2) * 2)
+    guard let c = rep.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else { return false }
+    // 按钮底色 #DFEAFE；窗口底色 #F7F8FA
+    return c.blueComponent - c.redComponent > 0.05
+}
+
+/// 视图树里按名字找色样背后的锚点（ColorAnchorView）
+func findAnchor(_ v: NSView, _ name: String) -> ColorAnchorView? {
+    if let a = v as? ColorAnchorView, a.name == name { return a }
+    for sub in v.subviews { if let a = findAnchor(sub, name) { return a } }
+    return nil
+}
+
 for lang in Language.allCases {
     LanguageSettings.shared.current = lang       // 离屏渲染直接设语言，不经过点击
     let names = Names.of(lang)
@@ -308,6 +331,11 @@ for lang in Language.allCases {
         var line = "\(name): \(Int(frameView.bounds.width))×\(Int(frameView.bounds.height)) → \(path)"
         compare(name, lang == .en ? shot.designEN : shot.design, rep, &line)
         print(line)
+        if ["06-layout", "06-controlled-view", "07-ripple", "07-ripple-controlled"].contains(shot.name) {
+            let want = model.isPaired && !model.isController
+            check(footerHasResetButton(rep) == want,
+                  "\(name)：本机是\(want ? "被控" : "主控")，底栏\(want ? "有" : "没有")「\(L.resetInput)」按钮")
+        }
         if shot.name == "06-layout" {
             // 标题栏右侧的切换按钮、语言开关能不能点到：看那一点被谁接住（不能是系统标题栏 / 工具栏）
             let tabChain = hitChain(frameView, NSPoint(x: lang == .en ? 700 : 750, y: kWindowSize.height - 27))
@@ -362,6 +390,8 @@ final class MenuSnapshotView: NSView {
             } else if let v = i.view {
                 // 「语言」一行是真实的视图（菜单里用的同一个）：按菜单宽度让它自己画一张，再贴到这一行
                 v.setFrameSize(NSSize(width: panel.width - 8, height: v.frame.height))
+                // 菜单项视图不是这张图的子视图，不继承浅色外观：系统是深色模式时 labelColor 会画成白字，这里固定浅色（菜单设计稿是浅色）
+                v.appearance = NSAppearance(named: .aqua)
                 if let rep = v.bitmapImageRepForCachingDisplay(in: v.bounds) {
                     v.cacheDisplay(in: v.bounds, to: rep)
                     rep.draw(in: NSRect(x: panel.minX + 4, y: y, width: v.bounds.width, height: v.bounds.height), from: .zero,
@@ -391,18 +421,29 @@ final class MenuSnapshotView: NSView {
 for lang in Language.allCases {
     LanguageSettings.shared.current = lang
     let n = Names.of(lang)
-    // 设计稿 01：已连接、本机是主控
-    let model = pairedModel(me: n.mini, peer: n.book, controller: true)
-    let content = StatusMenuContent(model: model)
-    let v = MenuSnapshotView(content: content, size: kWindowSize, panelOrigin: NSPoint(x: 551, y: 41), panelWidth: 328)
-    v.layoutSubtreeIfNeeded()
-    let rep = bitmap(of: v)
-    let name = "01-menu" + (lang == .en ? "-en" : "")
-    let path = "\(outDir)/\(name).png"
-    save(rep, path)
-    var line = "\(name): 菜单项 \(content.menu.items.filter { !$0.isHidden }.map { $0.view != nil ? "[语言行]" : ($0.isSeparatorItem ? "——" : $0.title) }.joined(separator: " / ")) → \(path)"
-    compare(name, lang == .en ? "baDOw" : "rtbYh", rep, &line)
-    print(line)
+    // 设计稿 01：已连接、本机是主控（没有「重置键鼠状态」一行）；被控视角没有单独的稿，另出一张人工检查
+    for controller in [true, false] {
+        let model = controller ? pairedModel(me: n.mini, peer: n.book, controller: true)
+                               : pairedModel(me: n.book, peer: n.mini, controller: false)
+        let content = StatusMenuContent(model: model)
+        let v = MenuSnapshotView(content: content, size: kWindowSize, panelOrigin: NSPoint(x: 551, y: 41), panelWidth: 328)
+        v.layoutSubtreeIfNeeded()
+        let rep = bitmap(of: v)
+        let name = "01-menu" + (controller ? "" : "-controlled") + (lang == .en ? "-en" : "")
+        let path = "\(outDir)/\(name).png"
+        save(rep, path)
+        let visible = content.menu.items.filter { !$0.isHidden }
+        let titles = visible.map { i -> String in
+            if let r = i.view as? ResetMenuRow { return "[\(r.title) \(L.resetHotkey)]" }
+            return i.view != nil ? "[语言行]" : (i.isSeparatorItem ? "——" : i.title)
+        }
+        var line = "\(name): 菜单项 \(titles.joined(separator: " / ")) → \(path)"
+        if controller { compare(name, lang == .en ? "baDOw" : "rtbYh", rep, &line) }
+        print(line)
+        let hasReset = visible.contains { $0.view is ResetMenuRow }
+        check(hasReset == !controller, "\(name)：本机是\(controller ? "主控" : "被控")，菜单里\(controller ? "没有" : "有")「\(L.resetInput)」一行")
+        check(visible.contains { $0.title == L.menuOpen }, "\(name)：菜单里有「\(L.menuOpen)」")
+    }
 }
 
 // MARK: - 08 状态弹窗合集
@@ -532,6 +573,90 @@ do {
     save(rep, "\(outDir)/07-preview-frozen.png")
     print("07-preview-frozen：出环命令 \(pv.spawned.count) 条（左 \(pv.spawned.filter { $0.side == .left }.count)、右 \(pv.spawned.filter { $0.side == .right }.count)） → \(outDir)/07-preview-frozen.png")
     RingHostView.frozenProgress = nil
+    wc.window.close()
+}
+
+// MARK: - 07a 取色器弹出状态
+
+// 07 页（中文、默认颜色）上，把「离开波纹」第一个色样标成正在编辑，再把取色器内容（真实的 ColorPickerView）单独画出来，
+// 按 NSPopover 的样子（白底、浅灰描边、阴影、尖角指向色样，水平居中于色样、不超出窗口）拼到这张页面上，和设计稿 zkCeP 对照。
+// NSPopover 本身是独立窗口、离屏画不出来，所以浮窗外框是这里照着画的；里面的内容是真实视图。
+do {
+    LanguageSettings.shared.current = .zh
+    let n = Names.of(.zh)
+    let model = pairedModel(me: n.book, peer: n.mini, controller: true)
+    model.tab = .ripple
+    let target = ColorEditTarget(group: \.leaveColors, index: 0)
+    let hex = model.ripple.leaveColors[0]
+    ColorPopoverController.shared.previewEditing(target, hex: hex, canDelete: model.ripple.leaveColors.count > 1)
+    let wc = MainWindowController(model: model)
+    let frameView = wc.window.contentView!.superview!
+    wc.window.layoutIfNeeded()
+    pump(0.4)
+    frameView.layoutSubtreeIfNeeded()
+    pump(0.2)
+    let page = bitmap(of: frameView)
+    let anchor = findAnchor(frameView, "leave-0")
+    check(anchor != nil, "07a：找到「离开波纹」第一个色样的锚点")
+    let a = anchor.map { $0.convert($0.bounds, to: frameView) } ?? NSRect(x: 183, y: 180, width: 18, height: 20)
+
+    // 取色器内容单独画一张
+    let size = ColorPopoverController.contentSize
+    let host = NSHostingView(rootView: ColorPickerView(model: ColorPopoverController.shared.picker))
+    host.frame = NSRect(origin: .zero, size: size)
+    let pwin = NSWindow(contentRect: host.frame, styleMask: [.borderless], backing: .buffered, defer: true)
+    pwin.contentView = host
+    host.layoutSubtreeIfNeeded()
+    pump(0.3)
+    let content = bitmap(of: host)
+    save(content, "\(outDir)/07a-picker-content.png")
+    check(Int(content.size.width) == 190 && Int(content.size.height) == 159, "07a：取色器主体 190 × 159 点")
+
+    // 拼图：浮窗在色样上方，尖角朝下指向色样中点；水平居中于色样，左右各留 8 点不超出窗口
+    let arrowH: CGFloat = 8, arrowW: CGFloat = 16
+    let bodyX = min(max(a.midX - size.width / 2, 8), kWindowSize.width - 8 - size.width)
+    let body = NSRect(x: bodyX, y: a.maxY + 1 + arrowH, width: size.width, height: size.height)
+    let out = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: page.pixelsWide, pixelsHigh: page.pixelsHigh,
+                               bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                               colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+    out.size = page.size
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: out)
+    page.draw(in: NSRect(origin: .zero, size: page.size))
+    let shape = NSBezierPath(roundedRect: body, xRadius: 10, yRadius: 10)
+    let arrow = NSBezierPath()
+    arrow.move(to: NSPoint(x: a.midX - arrowW / 2, y: body.minY + 0.5))
+    arrow.line(to: NSPoint(x: a.midX, y: body.minY - arrowH))
+    arrow.line(to: NSPoint(x: a.midX + arrowW / 2, y: body.minY + 0.5))
+    arrow.close()
+    shape.append(arrow)
+    NSGraphicsContext.saveGraphicsState()
+    let shadow = NSShadow()
+    shadow.shadowColor = NSColor(white: 0, alpha: 0.12)
+    shadow.shadowBlurRadius = 12
+    shadow.shadowOffset = NSSize(width: 0, height: -4)
+    shadow.set()
+    NSColor.white.setFill()
+    shape.fill()
+    NSGraphicsContext.restoreGraphicsState()
+    NSColor(srgbRed: 0xD4 / 255.0, green: 0xDC / 255.0, blue: 0xE6 / 255.0, alpha: 1).setStroke()
+    shape.lineWidth = 1
+    shape.stroke()
+    NSGraphicsContext.saveGraphicsState()
+    NSBezierPath(roundedRect: body.insetBy(dx: 1, dy: 1), xRadius: 9, yRadius: 9).addClip()
+    content.draw(in: body)
+    NSGraphicsContext.restoreGraphicsState()
+    NSGraphicsContext.restoreGraphicsState()
+    let path = "\(outDir)/07a-color-picker.png"
+    save(out, path)
+    var line = "07a-color-picker: 色样 (\(Int(a.minX)), \(Int(kWindowSize.height - a.maxY))) \(Int(a.width))×\(Int(a.height))，浮窗左上 (\(Int(body.minX)), \(Int(kWindowSize.height - body.maxY))) → \(path)"
+    compare("07a-color-picker", "zkCeP", out, &line)
+    print(line)
+    check(body.minX >= 0 && body.maxX <= kWindowSize.width && body.maxY <= kWindowSize.height - 54, "07a：浮窗在窗口内容区里，不超出窗口")
+    check(ColorPopoverController.shared.picker.hexText == hex && hex == "#FFFFFF", "07a：取色器的 HEX 显示正在编辑的颜色 #FFFFFF")
+    check(ColorPopoverController.shared.picker.canDelete, "07a：离开波纹有两个颜色，HEX 右边的删除按钮可点（红色图标）")
+    ColorPopoverController.shared.editing = nil
+    pwin.close()
     wc.window.close()
 }
 

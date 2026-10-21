@@ -224,8 +224,16 @@ final class AppModel: ObservableObject {
         exit(0)
     }
 
-    func releaseCursor() {
-        controller?.releaseCursor("菜单「收回光标」")
+    /// 「重置键鼠状态」按钮只在这时显示：本机是被控、和对方连着（主控那台用不上，底栏和菜单都不显示）
+    var canResetInput: Bool { isPaired && !isController && linkStatus == .connected }
+
+    /// 「重置键鼠状态」（主界面底栏按钮、菜单栏菜单）：光标在本机时交还主控，见 ControlledRole.resetInputState
+    func resetInputState(from source: String) {
+        guard let c = controlled else {
+            log("\(source)点了「重置键鼠状态」，但本机不是被控角色，忽略")
+            return
+        }
+        c.resetInputState("\(source)点了「重置键鼠状态」")
     }
 
     // MARK: - 已配对：连接与角色
