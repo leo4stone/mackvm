@@ -228,31 +228,27 @@ struct CrossingMap {
 
 // MARK: - 显示器位置后缀
 
+/// 同一台多块屏时每块屏在本台里的位置：横向第几列、纵向第几行（first = 左 / 上，last = 右 / 下）。
+/// 只算位置，不出文字；拼成「（左）」「 (Left)」这类后缀在界面层的文案表里做（Sources/UI/Strings.swift）。
+struct ScreenPosition: Equatable {
+    enum Slot: Int { case first = 0, middle = 1, last = 2 }
+    var column: Slot?       // nil = 横向只有一列（不需要区分左右）
+    var row: Slot?          // nil = 纵向只有一行
+}
+
 enum ScreenNaming {
-    /// 同一台多块屏时，按系统排列给每块屏一个位置后缀；只有一块屏时都是空字符串。
+    /// 同一台多块屏时，按系统排列给每块屏一个位置；只有一块屏时没有位置（不加后缀）。
     /// 横向：x 范围重叠一半以上的算同一列；纵向同理。列数 2 → 左 / 右，3 个以上 → 左 / 中 / 右；行同理（上 / 中 / 下）。
-    static func suffixes(_ screens: [ScreenInfo]) -> [String: String] {
-        guard screens.count > 1 else { return Dictionary(screens.map { ($0.id, "") }, uniquingKeysWith: { a, _ in a }) }
-        let h = rank(screens, vertical: false, labels: ("左", "中", "右"))
-        let v = rank(screens, vertical: true, labels: ("上", "中", "下"))
-        var out: [String: String] = [:]
-        for s in screens { out[s.id] = (h[s.id] ?? "") + (v[s.id] ?? "") }
+    static func positions(_ screens: [ScreenInfo]) -> [String: ScreenPosition] {
+        guard screens.count > 1 else { return [:] }
+        let h = rank(screens, vertical: false)
+        let v = rank(screens, vertical: true)
+        var out: [String: ScreenPosition] = [:]
+        for s in screens { out[s.id] = ScreenPosition(column: h[s.id], row: v[s.id]) }
         return out
     }
 
-    /// 带后缀的完整标签：「DELL U2720QM（左）」
-    static func labels(_ screens: [ScreenInfo]) -> [String: String] {
-        let suf = suffixes(screens)
-        var out: [String: String] = [:]
-        for s in screens {
-            let x = suf[s.id] ?? ""
-            out[s.id] = x.isEmpty ? s.name : "\(s.name)（\(x)）"
-        }
-        return out
-    }
-
-    private static func rank(_ screens: [ScreenInfo], vertical: Bool,
-                             labels: (String, String, String)) -> [String: String] {
+    private static func rank(_ screens: [ScreenInfo], vertical: Bool) -> [String: ScreenPosition.Slot] {
         func range(_ s: ScreenInfo) -> (Double, Double) { vertical ? (s.y, s.y + s.h) : (s.x, s.x + s.w) }
         // 并查集：范围重叠超过较短一方一半的归为一组
         var parent = Array(screens.indices)
@@ -272,10 +268,10 @@ enum ScreenNaming {
             let c2 = g2.map { (range(screens[$0]).0 + range(screens[$0]).1) / 2 }.reduce(0, +) / Double(g2.count)
             return c1 < c2
         }
-        var out: [String: String] = [:]
+        var out: [String: ScreenPosition.Slot] = [:]
         for (k, g) in ordered.enumerated() {
-            let label = k == 0 ? labels.0 : (k == ordered.count - 1 ? labels.2 : labels.1)
-            for i in g { out[screens[i].id] = label }
+            let slot: ScreenPosition.Slot = k == 0 ? .first : (k == ordered.count - 1 ? .last : .middle)
+            for i in g { out[screens[i].id] = slot }
         }
         return out
     }

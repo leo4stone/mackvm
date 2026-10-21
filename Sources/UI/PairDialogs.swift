@@ -16,24 +16,24 @@ struct InviteDialog: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("等待另一台 Mac 来连接").font(.ui(24, .semibold)).lh(24).foregroundStyle(Theme.text)
-            Text("在另一台 Mac 点击「添加被控设备」，选择本机并输入下方配对码。").font(.ui(13)).lh(13).foregroundStyle(Theme.sub)
+            Text(L.inviteTitle).font(.ui(24, .semibold)).lh(24).foregroundStyle(Theme.text)
+            Text(L.inviteSubtitle).font(.ui(13)).lh(13).foregroundStyle(Theme.sub)
             VStack(alignment: .leading, spacing: 18) {
-                Text("本机设备名").font(.ui(12)).lh(12).foregroundStyle(Theme.sub)
+                Text(L.inviteDeviceName).font(.ui(12)).lh(12).foregroundStyle(Theme.sub)
                 Text(model.me.name).font(.ui(22, .semibold)).lh(22).foregroundStyle(Theme.text)
                 CodeDigits(code: model.inviteCode).frame(maxWidth: .infinity)
                 if let p = model.inviteProblem {
-                    Text(p).font(.ui(13)).lh(13).foregroundStyle(Theme.red)
+                    Text(L.networkProblem(p)).font(.ui(13)).lh(13).foregroundStyle(Theme.red)
                 } else if model.inviteRenewed {
-                    Text("密钥已自动更新 · 请让对方使用新密钥重新输入").font(.ui(13)).lh(13).foregroundStyle(Theme.amber)
+                    Text(L.inviteRenewed).font(.ui(13)).lh(13).foregroundStyle(Theme.amber)
                 } else {
-                    Text("正在局域网广播 · 等待配对…").font(.ui(13)).lh(13).foregroundStyle(Theme.blue)
+                    Text(L.inviteBroadcasting).font(.ui(13)).lh(13).foregroundStyle(Theme.blue)
                 }
-                Text("请仅向你信任的设备提供此密钥。").font(.ui(12)).lh(12).foregroundStyle(Theme.sub)
+                Text(L.inviteTrust).font(.ui(12)).lh(12).foregroundStyle(Theme.sub)
             }
             HStack(spacing: 12) {
-                Button("取消配对") { model.cancelInvite() }.buttonStyle(KVMButtonStyle(kind: .secondary))
-                Text("取消后立即停止广播").font(.ui(12)).lh(12).foregroundStyle(Theme.sub)
+                Button(L.inviteCancel) { model.cancelInvite() }.buttonStyle(KVMButtonStyle(kind: .secondary))
+                Text(L.inviteCancelNote).font(.ui(12)).lh(12).foregroundStyle(Theme.sub)
             }
         }
         .padding(28)
@@ -75,15 +75,15 @@ struct SeekDialog: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("连接另一台 Mac").font(.ui(24, .semibold)).lh(24).foregroundStyle(Theme.text)
-            Text("选择要连接的设备。对方需先点击「邀请主控设备」。").font(.ui(13)).lh(13).foregroundStyle(Theme.sub)
+            Text(L.seekTitle).font(.ui(24, .semibold)).lh(24).foregroundStyle(Theme.text)
+            Text(L.seekSubtitle).font(.ui(13)).lh(13).foregroundStyle(Theme.sub)
             VStack(alignment: .leading, spacing: 18) {
-                Text("局域网设备").font(.ui(15, .semibold)).lh(15).foregroundStyle(Theme.text)
-                Text("持续查找中 · 列表自动更新").font(.ui(11)).lh(11).foregroundStyle(Theme.sub)
+                Text(L.seekListTitle).font(.ui(15, .semibold)).lh(15).foregroundStyle(Theme.text)
+                Text(L.seekListNote).font(.ui(11)).lh(11).foregroundStyle(Theme.sub)
                 if model.seekDevices.isEmpty {
                     HStack(spacing: 10) {
                         ProgressView().controlSize(.small)
-                        Text(model.seekProblem ?? "正在查找正在邀请的 Mac…")
+                        Text(model.seekProblem.map(L.networkProblem) ?? L.seekEmpty)
                             .font(.ui(13)).lh(13).foregroundStyle(model.seekProblem == nil ? Theme.sub : Theme.red)
                     }
                     .padding(14)
@@ -95,7 +95,7 @@ struct SeekDialog: View {
                             HStack(spacing: 10) {
                                 Text(d.name).font(.ui(14, .medium)).lh(14).foregroundStyle(Theme.blue).lineLimit(1)
                                 Spacer()
-                                Button("配对…") { model.chooseDevice(d) }
+                                Button(L.seekPair) { model.chooseDevice(d) }
                                     .buttonStyle(KVMButtonStyle(padV: 9, padH: 16, radius: 7))
                             }
                             .padding(14)
@@ -104,7 +104,7 @@ struct SeekDialog: View {
                     }
                 }
             }
-            Button("取消") { model.cancelSeek() }.buttonStyle(KVMButtonStyle(kind: .secondary))
+            Button(L.cancel) { model.cancelSeek() }.buttonStyle(KVMButtonStyle(kind: .secondary))
         }
         .padding(28)
         .frame(width: 620, alignment: .leading)
@@ -138,10 +138,10 @@ struct CodeDialog: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text("与「\(device.name)」配对").font(.ui(20, .semibold)).lh(20).foregroundStyle(Theme.text)
-            Text("输入对方屏幕上显示的 8 位配对码").font(.ui(12)).lh(12).foregroundStyle(Theme.sub)
+            Text(L.codeTitle(device.name)).font(.ui(20, .semibold)).lh(20).foregroundStyle(Theme.text)
+            Text(L.codeSubtitle).font(.ui(12)).lh(12).foregroundStyle(Theme.sub)
             VStack(alignment: .leading, spacing: 8) {
-                TextField("", text: text, prompt: Text("8 位数字").foregroundStyle(Theme.sub.opacity(0.6)))
+                TextField("", text: text, prompt: Text(L.codePlaceholder).foregroundStyle(Theme.sub.opacity(0.6)))
                     .textFieldStyle(.plain)
                     .font(.system(size: 22).monospacedDigit()).lh(22)
                     .foregroundStyle(Theme.text)
@@ -153,13 +153,13 @@ struct CodeDialog: View {
                     .overlay(RoundedRectangle(cornerRadius: 7)
                         .strokeBorder(model.codeError == nil ? Theme.blue : Theme.red, lineWidth: 1))
                 if let e = model.codeError {
-                    Text(e).font(.ui(12)).lh(12).foregroundStyle(Theme.red).fixedSize(horizontal: false, vertical: true)
+                    Text(L.codeError(e)).font(.ui(12)).lh(12).foregroundStyle(Theme.red).fixedSize(horizontal: false, vertical: true)
                 }
             }
             HStack(spacing: 10) {
                 Spacer()
-                Button("取消") { model.cancelCodeEntry() }.buttonStyle(KVMButtonStyle(kind: .grey))
-                Button(model.pairingBusy ? "配对中…" : "配对") { model.submitCode() }
+                Button(L.cancel) { model.cancelCodeEntry() }.buttonStyle(KVMButtonStyle(kind: .grey))
+                Button(model.pairingBusy ? L.codePairing : L.codePair) { model.submitCode() }
                     .buttonStyle(KVMButtonStyle())
                     .disabled(model.pairingBusy || model.codeInput.count != 8)
             }
@@ -178,12 +178,12 @@ struct CodeRenewedDialog: View {
     @EnvironmentObject var model: AppModel
 
     var body: some View {
-        StateDialog(title: "密钥已自动更新",
-                    message: "对方连续 5 次输错密钥，旧密钥已作废。\n新密钥：\(grouped(model.inviteCode, sep: "–"))",
-                    note: "查看新密钥并告知对方；取消邀请将停止广播。",
+        StateDialog(title: L.renewedTitle,
+                    message: L.renewedMessage(grouped(model.inviteCode, sep: "–")),
+                    note: L.renewedNote,
                     onClose: { model.showNewCode() }) {
-            Button("取消邀请") { model.cancelInvite() }.buttonStyle(DialogButton(kind: .grey))
-            Button("查看新密钥") { model.showNewCode() }.buttonStyle(DialogButton())
+            Button(L.cancelInvitation) { model.cancelInvite() }.buttonStyle(DialogButton(kind: .grey))
+            Button(L.viewNewCode) { model.showNewCode() }.buttonStyle(DialogButton())
         }
     }
 }
@@ -192,12 +192,12 @@ struct NoDevicesDialog: View {
     @EnvironmentObject var model: AppModel
 
     var body: some View {
-        StateDialog(title: "没找到可配对的设备",
-                    message: model.seekProblem ?? "请在另一台 Mac 点击「邀请主控设备」，并确认两台处于同一局域网。",
-                    note: "设备列表持续更新；取消查找可返回角色选择。",
+        StateDialog(title: L.noDevicesTitle,
+                    message: model.seekProblem.map(L.networkProblem) ?? L.noDevicesMessage,
+                    note: L.noDevicesNote,
                     onClose: { model.continueSeek() }) {
-            Button("取消查找") { model.cancelSeek() }.buttonStyle(DialogButton(kind: .grey))
-            Button("继续查找") { model.continueSeek() }.buttonStyle(DialogButton())
+            Button(L.cancelSearch) { model.cancelSeek() }.buttonStyle(DialogButton(kind: .grey))
+            Button(L.keepSearching) { model.continueSeek() }.buttonStyle(DialogButton())
         }
     }
 }
@@ -207,12 +207,10 @@ struct PairSuccessDialog: View {
 
     var body: some View {
         let done = { model.dialog = nil; model.tab = .connection }
-        StateDialog(title: "配对成功",
-                    message: model.isController
-                        ? "已与「\(model.peerName)」配对。\n本机操作对方，从蓝色相接边段推出光标即可切过去。"
-                        : "已与「\(model.peerName)」配对。\n本机由对方操作，局域网广播已停止。",
+        StateDialog(title: L.pairSuccessTitle,
+                    message: L.pairSuccessMessage(model.peerName, controller: model.isController),
                     onClose: done) {
-            Button("完成，查看设备连接", action: done).buttonStyle(DialogButton(size: 13, padH: 16))
+            Button(L.pairSuccessDone, action: done).buttonStyle(DialogButton(size: 13, padH: 16))
         }
     }
 }
@@ -239,7 +237,7 @@ struct StateDialog<Actions: View>: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help("关闭")
+                .help(L.close)
             }
             Text(message).font(.ui(12)).foregroundStyle(Theme.sub).lineSpacing(5)
                 .fixedSize(horizontal: false, vertical: true)

@@ -327,15 +327,84 @@ func unitTests() {
           "从被控一侧迁移、对方 P2319H 拔掉了：拔掉的屏也按规则摆（贴着内建屏左边）；规则没提到的 U2720QM 放到最右边")
 
     print("== 显示器位置后缀")
-    check(ScreenNaming.labels([U, P]) == ["U2720QM": "DELL U2720QM（左）", "P2319H": "DELL P2319H（右）"],
+    check(ScreenNaming.labels([U, P], .zh) == ["U2720QM": "DELL U2720QM（左）", "P2319H": "DELL P2319H（右）"],
           "两块 DELL 左右并排（顶部对齐、高度不同）：左 / 右")
-    check(ScreenNaming.labels([B]) == ["BUILTIN": "内建屏幕"], "只有一块屏：不加后缀")
-    check(ScreenNaming.suffixes([S1, S2]) == ["S1": "上", "S2": "下"], "上下叠放：上 / 下")
+    check(ScreenNaming.labels([B], .zh) == ["BUILTIN": "内建屏幕"], "只有一块屏：不加后缀")
+    check(ScreenNaming.suffixes([S1, S2], .zh) == ["S1": "上", "S2": "下"], "上下叠放：上 / 下")
     let T3 = ScreenInfo(id: "T3", name: "右", isMain: false, isBuiltin: false, x: 1920, y: 0, w: 1920, h: 1080, mmW: 500, mmH: 280, estimated: false)
-    check(ScreenNaming.suffixes([S3, S2, T3]) == ["S3": "左", "S2": "中", "T3": "右"], "三块一排：左 / 中 / 右")
+    check(ScreenNaming.suffixes([S3, S2, T3], .zh) == ["S3": "左", "S2": "中", "T3": "右"], "三块一排：左 / 中 / 右")
     let D1 = ScreenInfo(id: "D1", name: "a", isMain: true, isBuiltin: false, x: 0, y: 0, w: 1000, h: 800, mmW: 300, mmH: 200, estimated: false)
     let D2 = ScreenInfo(id: "D2", name: "b", isMain: false, isBuiltin: false, x: 1000, y: 800, w: 1000, h: 800, mmW: 300, mmH: 200, estimated: false)
-    check(ScreenNaming.suffixes([D1, D2]) == ["D1": "左上", "D2": "右下"], "斜着摆：左上 / 右下")
+    check(ScreenNaming.suffixes([D1, D2], .zh) == ["D1": "左上", "D2": "右下"], "斜着摆：左上 / 右下")
+
+    print("== 显示器位置后缀（英文）")
+    check(ScreenNaming.labels([U, P], .en) == ["U2720QM": "DELL U2720QM (Left)", "P2319H": "DELL P2319H (Right)"],
+          "英文：「DELL U2720QM (Left)」「DELL P2319H (Right)」，半角括号、前面空一格")
+    check(ScreenNaming.labels([B], .en) == ["BUILTIN": "Built-in display"], "英文：内建屏叫 Built-in display，只有一块屏不加后缀")
+    check(ScreenNaming.suffixes([S1, S2], .en) == ["S1": "Top", "S2": "Bottom"], "英文：上下叠放 Top / Bottom")
+    check(ScreenNaming.suffixes([S3, S2, T3], .en) == ["S3": "Left", "S2": "Center", "T3": "Right"], "英文：三块一排 Left / Center / Right")
+    check(ScreenNaming.suffixes([D1, D2], .en) == ["D1": "Top Left", "D2": "Bottom Right"], "英文：斜着摆 Top Left / Bottom Right（纵向在前）")
+    check(ScreenNaming.labels([D1, D2], .en)["D1"] == "a (Top Left)", "英文：组合后缀放进半角括号")
+    check(L.positionSuffix(ScreenPosition(column: .middle, row: .middle), .en) == "Center"
+          && L.positionSuffix(ScreenPosition(column: .first, row: .middle), .en) == "Middle Left"
+          && L.positionSuffix(ScreenPosition(column: .middle, row: .middle), .zh) == "中中",
+          "英文：两个方向都在中间只写 Center；纵向在中间叫 Middle")
+    check(L.screenName(B, .zh) == "内建屏幕" && L.screenName(U, .en) == "DELL U2720QM",
+          "显示器名字用系统给的、不翻译；只有本程序起的「内建屏幕」翻译")
+
+    print("== 界面语言：默认跟系统、记住的优先")
+    check(Language.systemDefault(["zh-Hans-CN", "en-US"]) == .zh, "系统首选 zh-Hans-CN → 中文")
+    check(Language.systemDefault(["en-US", "zh-Hans-CN"]) == .en, "系统首选 en-US（中文排第二）→ 英文")
+    check(Language.systemDefault(["zh-Hant-TW"]) == .zh && Language.systemDefault(["zh"]) == .zh, "zh-Hant-TW、zh 也算中文")
+    check(Language.systemDefault(["ja-JP"]) == .en && Language.systemDefault([]) == .en, "其他语言、读不到首选语言 → 英文")
+    check(Language.resolve(saved: .en, preferred: ["zh-Hans-CN"]) == .en
+          && Language.resolve(saved: .zh, preferred: ["en-US"]) == .zh, "记住的语言优先于系统")
+    check(Language.resolve(saved: nil, preferred: ["zh-Hans-CN"]) == .zh
+          && Language.resolve(saved: nil, preferred: ["en-US"]) == .en, "没记住过就跟系统")
+    let langDir = URL(fileURLWithPath: ProcessInfo.processInfo.environment["MACKVM_HOME"] ?? NSTemporaryDirectory())
+        .appendingPathComponent("lang-test")
+    try? FileManager.default.removeItem(at: langDir)
+    let langStore = Store(dir: langDir)
+    var st = langStore.load()
+    check(st.language == nil, "新状态文件里没有语言（= 跟系统）")
+    // 记一个和本机系统默认相反的语言，看启动时是不是按记住的来
+    let sys = Language.systemDefault()
+    let other: Language = sys == .zh ? .en : .zh
+    st.language = other
+    langStore.save(st)
+    check(langStore.load().language == other, "语言写进本机状态文件、读回来一样")
+    let langModel = AppModel(store: langStore)
+    check(LanguageSettings.shared.current == other, "启动时按记住的语言（\(other.rawValue)），不跟系统（\(sys.rawValue)）")
+    langModel.setLanguage(sys)
+    check(LanguageSettings.shared.current == sys && langStore.load().language == sys, "手动切换立即生效并记住")
+    let oldStateJSON = #"{"deviceID":"x","ripple":{}}"#.data(using: .utf8)!
+    check((try? JSONDecoder().decode(PersistedState.self, from: oldStateJSON)).map { $0.language == nil } == true,
+          "旧版状态文件没有语言字段也能读（按跟系统处理）")
+    let shared = SharedSettings(revision: 1, editor: "a", controllerID: "a", ripple: .defaults)
+    let sharedJSON = String(data: try! JSONEncoder().encode(shared), encoding: .utf8)!
+    check(!sharedJSON.contains("language"), "语言不进两台同步的共享设置")
+
+    print("== 界面文案随语言切换")
+    LanguageSettings.shared.current = .en
+    check(L.tabConnection == "Devices" && L.tabRipple == "Cursor Effects", "英文：标题栏 Devices / Cursor Effects")
+    check(L.menuStatus(.connected, peer: "My MacBook Pro") == "● Connected · My MacBook Pro", "英文：菜单状态行")
+    check(L.screenSize(mmW: 599, mmH: 340, inches: 27, main: true, estimated: false) == "599 × 340 mm · 27-inch · Main",
+          "英文：屏幕尺寸行「599 × 340 mm · 27-inch · Main」")
+    check(L.screenRole(local: true, present: true, input: true) == "This Mac · Keyboard and mouse connected"
+          && L.screenRole(local: false, present: true, input: false) == "Other Mac · Controlled", "英文：屏幕角色行")
+    check(L.codeError(.wrongCode(left: 1)).contains("1 attempt left") && L.codeError(.wrongCode(left: 4)).contains("4 attempts left"),
+          "英文：剩余次数单复数")
+    check(L.codeError(.wrongCode(left: 4), .zh) == "配对码不正确，请重新输入（还可再试 4 次）", "日志用的中文错误提示不随界面语言变")
+    check(L.networkProblem(describeNetworkError(NWError.dns(DNSServiceErrorType(kDNSServiceErr_PolicyDenied)))).hasPrefix("No Local Network access"),
+          "英文：没有本地网络权限的提示换成英文")
+    check(L.secondsValue("0.4") == "0.4 s" && L.rippleFootnote(min: "1", idle: "0.5", max: "5")
+          == "Move left to right to preview. Entry ripples run for 1–5 s and stop after 0.5 s idle.", "英文：秒数和 07 页底部说明")
+    LanguageSettings.shared.current = .zh
+    check(L.tabConnection == "设备连接" && L.menuStatus(.searching, peer: "书房 Mac mini") == "● 正在寻找对方 · 书房 Mac mini",
+          "切回中文立即生效")
+    check(L.screenSize(mmW: 599, mmH: 340, inches: 27, main: true, estimated: true) == "599 × 340 mm · 27 英寸 · 主屏（尺寸为估算）",
+          "中文：屏幕尺寸行")
+    check(L.networkProblem("创建监听失败：x") == "创建监听失败：x", "中文界面：网络提示原样显示")
 
     print("== 共享设置：布局和规则同步、旧数据、默认布局只生成一次")
     let s = SharedSettings(revision: 3, editor: "a", controllerID: "a", rules: [def], rulesInitialized: true, ripple: .defaults)

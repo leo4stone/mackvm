@@ -1,4 +1,5 @@
-// 主窗口：900×620 的单窗口，SwiftUI 画全部内容（标题栏底色和右侧的「设备连接 / 光标特效」切换、各页、底栏、弹窗遮罩）。
+// 主窗口：900×620 的单窗口，SwiftUI 画全部内容（标题栏底色和右侧的「设备连接 / 光标特效」切换、「中文 / EN」语言开关、
+// 各页、底栏、弹窗遮罩）。语言一变整棵视图按新语言重建（RootView 上的 .id），文案见 Strings.swift。
 // 进程是 .accessory，打开窗口时临时激活本应用把窗口带到前台；关掉窗口只是隐藏，进程照常运行。
 // 关窗口时顺手取消正在进行的配对流程（停止广播 / 停止查找），免得在看不见的地方一直广播。
 
@@ -74,6 +75,7 @@ final class MainWindowController: NSObject, NSWindowDelegate {
 
 struct RootView: View {
     @EnvironmentObject var model: AppModel
+    @ObservedObject private var language = LanguageSettings.shared
 
     var body: some View {
         VStack(spacing: 0) {
@@ -96,12 +98,15 @@ struct RootView: View {
         .frame(width: kWindowSize.width, height: kWindowSize.height)
         .background(Theme.windowBG)
         .overlay { DialogLayer() }
+        // 文案都按 L.lang 现取：换语言时让整棵视图重建，没有输入参数的子视图（如底栏）也会重画
+        .id(language.current)
         .ignoresSafeArea()
         .environment(\.colorScheme, .light)
     }
 }
 
-/// 54 点高的标题栏：居中的图标加应用名，右侧「设备连接 / 光标特效」切换（未配对时只有「设备连接」）
+/// 54 点高的标题栏：居中的图标加应用名，右侧「设备连接 / 光标特效」切换（未配对时只有「设备连接」），
+/// 再往右是「中文 / EN」语言开关（未配对时也有）
 struct TitleBar: View {
     @EnvironmentObject var model: AppModel
 
@@ -114,14 +119,15 @@ struct TitleBar: View {
                 Text("MacKVM").font(.ui(14, .semibold)).foregroundStyle(Theme.text)
             }
             .allowsHitTesting(false)
-            HStack {
+            HStack(spacing: 8) {
                 Spacer()
                 HStack(spacing: 2) {
-                    tab("设备连接", .connection)
-                    if model.isPaired { tab("光标特效", .ripple) }
+                    tab(L.tabConnection, .connection)
+                    if model.isPaired { tab(L.tabRipple, .ripple) }
                 }
                 .padding(3)
                 .background(RoundedRectangle(cornerRadius: 8).fill(Theme.segmentBG))
+                LanguageToggle(current: L.lang) { model.setLanguage($0) }
             }
             .padding(.horizontal, 20)
         }
@@ -145,12 +151,45 @@ struct TitleBar: View {
     }
 }
 
+/// 「中文 / EN」语言开关：灰底胶囊里两段，当前语言那段白底加粗。标题栏和菜单栏菜单（StatusMenu 里用 AppKit 画的同款）各一个
+struct LanguageToggle: View {
+    let current: Language
+    let set: (Language) -> Void
+
+    var body: some View {
+        HStack(spacing: 0) {
+            segment(L.languageZh, .zh)
+            segment(L.languageEn, .en)
+        }
+        .padding(3)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Theme.segmentBG))
+        .help(L.languageHelp)
+    }
+
+    private func segment(_ title: String, _ l: Language) -> some View {
+        let on = current == l
+        return Button {
+            if !on { set(l) }
+        } label: {
+            Text(title)
+                .font(.ui(12, on ? .semibold : .regular)).lh(12)
+                .foregroundStyle(on ? Theme.text : Theme.sub)
+                .padding(.vertical, 5)
+                .padding(.horizontal, 7)
+                .frame(minWidth: 33)
+                .background(RoundedRectangle(cornerRadius: 6).fill(on ? Color.white : Color.clear))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 struct Footer: View {
     var body: some View {
         HStack {
-            Text("关闭窗口后仍在后台运行 · 开机自动启动").font(.ui(11)).foregroundStyle(Theme.sub)
+            Text(L.footerBackground).font(.ui(11)).foregroundStyle(Theme.sub)
             Spacer()
-            Text("紧急收回光标  ⌃ ⌥ ⌘ L").font(.ui(12, .medium)).foregroundStyle(Theme.sub)
+            Text(L.footerHotkey).font(.ui(12, .medium)).foregroundStyle(Theme.sub)
         }
         .padding(.horizontal, 24)
         .frame(height: 47.5)

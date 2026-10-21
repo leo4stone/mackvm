@@ -6,6 +6,7 @@
 //   - 两台互相交换屏幕清单；配对后由主控生成一次默认布局；旧数据只有规则时按规则摆出布局；
 //   - 用户在「设备连接」页摆放屏幕：更新布局、从布局推导相邻规则，一起同步给对方；
 //   - 给界面算连接状态：已连接 / 正在寻找对方 / 对方不在线。
+//   - 界面语言的切换和记忆（只存本机；当前语言在 LanguageSettings，文案表见 UI/Strings.swift）。
 // 所有方法都只在主线程调用（网络回调都排在主队列上）。
 
 import AppKit
@@ -34,6 +35,15 @@ enum Dialog: Equatable {
     case linkInfo                       // 08 点击连接状态标签才弹出的说明（状态变化时绝不自动弹）
     case confirmUnpair                  // 解除配对确认
     case confirmSwap                    // 切换输入设备（对调角色）确认
+}
+
+/// 输入配对码时的错误（给人看的文字在界面层按当前语言拼，见 L.codeError）
+enum CodeError: Equatable {
+    case incomplete                 // 没输满 8 位
+    case wrongCode(left: Int)       // 配对码不对，还能再试几次
+    case renewed                    // 输错太多次，对方已换码
+    case busy                       // 对方正在和别的设备配对
+    case failed(String)             // 网络或协议问题（原因是中文诊断，只有中文界面显示）
 }
 
 /// 连上之后互相告知的本机信息
@@ -65,7 +75,7 @@ final class AppModel: ObservableObject {
     @Published var seekDevices: [DiscoveredDevice] = []
     @Published var seekProblem: String?
     @Published var codeInput = ""
-    @Published var codeError: String?
+    @Published var codeError: CodeError?
     @Published var pairingBusy = false
 
     /// 界面层注册：把主窗口叫到前台
@@ -105,6 +115,8 @@ final class AppModel: ObservableObject {
             s.shared = nil
         }
         state = s
+        // 界面语言：用户手动切过就按记住的，否则跟系统（只存本机，不在两台之间同步）
+        LanguageSettings.shared.current = Language.resolve(saved: s.language)
         me = DeviceIdentity(id: s.deviceID, name: currentComputerName(), isLaptop: hasInternalBattery())
         pairing = s.pairing
         shared = s.shared
@@ -119,6 +131,16 @@ final class AppModel: ObservableObject {
         state = PersistedState(deviceID: me.id)
         self.me = me
         localRipple = .defaults
+    }
+
+    /// 切换界面语言（标题栏和菜单栏的「中文 / EN」开关）：立即生效，记进本机状态文件，下次启动按记住的来
+    func setLanguage(_ l: Language) {
+        let changed = l != LanguageSettings.shared.current
+        if changed { LanguageSettings.shared.current = l }
+        guard state.language != l else { return }
+        state.language = l
+        persist()
+        if changed { log("界面语言切换为\(l == .zh ? "中文" : "英文")") }
     }
 
     /// 复位弹窗以外的临时交互状态（兜底：拖动被打断没收到结束、弹出框状态和实际不一致）
@@ -661,7 +683,7 @@ final class AppModel: ObservableObject {
         guard case .enterCode(let d) = dialog, !pairingBusy else { return }
         let code = PairingCrypto.digits(codeInput)
         guard code.count == 8 else {
-            codeError = "请输入完整的 8 位配对码"
+            codeError = .incomplete
             return
         }
         pairingBusy = true
@@ -680,16 +702,16 @@ final class AppModel: ObservableObject {
             case .failure(let f):
                 switch f {
                 case .wrongCode(let left):
-                    self.codeError = "配对码不正确，请重新输入（还可再试 \(left) 次）"
+                    self.codeError = .wrongCode(left: left)
                 case .renewed:
-                    self.codeError = "输错次数过多，对方已换了新的配对码，请输入对方屏幕上的新配对码"
+                    self.codeError = .renewed
                 case .busy:
-                    self.codeError = "对方正在和别的设备配对，请稍后再试"
+                    self.codeError = .busy
                 case .failed(let why):
-                    self.codeError = "没能完成配对（\(why)）。请确认对方仍在等待配对"
+                    self.codeError = .failed(why)
                 }
                 if f != .busy { self.codeInput = "" }
-                log("配对没有成功：\(self.codeError ?? "")")
+                log("配对没有成功：\(self.codeError.map { L.codeError($0, .zh) } ?? "")")
             }
         }
     }
@@ -754,7 +776,7 @@ final class AppModel: ObservableObject {
 
 /// 日志里描述一组屏幕
 func describeScreens(_ list: [ScreenInfo]) -> String {
-    let labels = ScreenNaming.labels(list)
+    let labels = ScreenNaming.labels(list, .zh)
     return list.map { s in
         "「\(labels[s.id] ?? s.name)」\(s.isMain ? "主屏 " : "")\(Int(s.w))×\(Int(s.h)) 点 @(\(Int(s.x)),\(Int(s.y)))，\(Int(s.mmW.rounded()))×\(Int(s.mmH.rounded())) 毫米\(s.estimated ? "（估算）" : "")，ID \(s.id.prefix(8))"
     }.joined(separator: "；")

@@ -27,16 +27,16 @@ struct ConnectionPage: View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .center, spacing: 12) {
-                    Text("屏幕相邻关系").font(.ui(26, .semibold)).lh(26).foregroundStyle(Theme.text)
+                    Text(L.layoutTitle).font(.ui(26, .semibold)).lh(26).foregroundStyle(Theme.text)
                     Spacer(minLength: 0)
                     Button { model.dialog = .linkInfo } label: { StatusPill(status: model.linkStatus) }
                         .buttonStyle(.plain)
-                        .help("查看连接状态说明")
-                    Button("解除配对") { model.dialog = .confirmUnpair }
+                        .help(L.statusHelp)
+                    Button(L.unpair) { model.dialog = .confirmUnpair }
                         .buttonStyle(KVMButtonStyle(kind: .secondary, size: 13, weight: .medium, padV: 9, padH: 16))
                 }
                 .frame(height: 38)
-                Text("拖动屏幕自由摆放，蓝色相接边段可跨屏，拖开即停止跨屏。")
+                Text(L.layoutSubtitle)
                     .font(.ui(13)).lh(13).foregroundStyle(Theme.sub)
             }
             .frame(height: 64)
@@ -47,11 +47,11 @@ struct ConnectionPage: View {
 }
 
 extension AppModel {
-    /// 两台屏幕的完整标签（带位置后缀）；拔掉的屏用见过的信息
+    /// 两台屏幕的完整标签（带位置后缀，按当前界面语言）；拔掉的屏用见过的信息
     var screenLabels: [String: String] {
-        var out = ScreenNaming.labels(localScreens)
-        for (k, v) in ScreenNaming.labels(peerScreens) { out[k] = v }
-        for (id, s) in knownScreens where out[id] == nil { out[id] = s.name }
+        var out = ScreenNaming.labels(localScreens, L.lang)
+        for (k, v) in ScreenNaming.labels(peerScreens, L.lang) { out[k] = v }
+        for (id, s) in knownScreens where out[id] == nil { out[id] = L.screenName(s) }
         return out
     }
 }
@@ -113,14 +113,14 @@ private struct LayoutPreview: View {
                 RoundedRectangle(cornerRadius: 12).fill(Theme.previewBG)
                 RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.previewStroke, lineWidth: 1)
                 if base.isEmpty {
-                    Text("还没读到显示器信息，连上对方后会显示。")
+                    Text(L.layoutNoScreens)
                         .font(.ui(13)).foregroundStyle(Theme.sub)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 ForEach(shown, id: \.key) { s in
                     let r = t.rect(s.rect)
                     let dragging = s.key == draggingKey
-                    ScreenCard(screen: s, label: model.screenLabels[s.info.id] ?? s.info.name, size: r.size,
+                    ScreenCard(screen: s, label: model.screenLabels[s.info.id] ?? L.screenName(s.info), size: r.size,
                                blocked: dragging && isBlocked(s, among: shown))
                         .frame(width: r.width, height: r.height)
                         .position(x: r.midX, y: r.midY)
@@ -229,10 +229,10 @@ private struct LayoutPreview: View {
     private func noticeLines(seams: [Seam]) -> [String] {
         var out: [String] = []
         if !seams.contains(where: \.active) {
-            out.append("光标现在跨不到另一台。需要时按 Ctrl + Option + Cmd + L 紧急收回光标。")
+            out.append(L.noticeNoCrossing)
         }
         if model.linkStatus != .connected {
-            out.append("对方离线：使用上次连接信息，重连后同步。")
+            out.append(L.noticeOffline)
         }
         return out
     }
@@ -277,13 +277,13 @@ private struct ScreenCard: View {
         let isInput = isLocal == model.isController
         let device = isLocal ? model.me.name : model.peerName
         let sameDevice = isLocal ? model.localScreens.count : model.peerScreens.count
-        let sizeLine = "\(Int(s.mmW.rounded())) × \(Int(s.mmH.rounded())) mm · \(s.inches) 英寸"
-            + (s.isMain && sameDevice > 1 ? " · 主屏" : "") + (s.estimated ? "（尺寸为估算）" : "")
-        let who = isLocal ? "本机" : "对方"
-        let role = present ? who + " · " + (isInput ? "键盘鼠标接在这里" : "受控设备") : who + " · 未接上"
+        let sizeLine = L.screenSize(mmW: s.mmW, mmH: s.mmH, inches: s.inches, main: s.isMain && sameDevice > 1,
+                                    estimated: s.estimated)
+        let who = L.screenOwner(local: isLocal)
+        let role = L.screenRole(local: isLocal, present: present, input: isInput)
         let ink = !present ? Theme.sub : (isLocal ? Theme.blue : Theme.sub)
         let showSwap = present && !isInput
-        let swap = Button("切换为输入设备") { model.dialog = .confirmSwap }
+        let swap = Button(L.swapButton) { model.dialog = .confirmSwap }
             .buttonStyle(SwapButtonStyle())
             .fixedSize()
         ZStack(alignment: .topTrailing) {
@@ -311,7 +311,7 @@ private struct ScreenCard: View {
                 }
                 VStack(spacing: 2) {
                     Text(label).font(.ui(12, .semibold))
-                    Text(present ? who : who + " · 未接上").font(.ui(10))
+                    Text(present ? who : role).font(.ui(10))
                 }
                 Text(label).font(.ui(10, .semibold))
             }
@@ -324,7 +324,7 @@ private struct ScreenCard: View {
             if present {
                 DragHandle(color: isLocal ? Theme.localStroke : Theme.sub.opacity(0.55))
                     .padding(10)
-                    .help("拖动摆放这块屏幕")
+                    .help(L.dragHandleHelp)
             }
         }
         .background(RoundedRectangle(cornerRadius: 5).fill(!present ? Theme.unpluggedFill : (isLocal ? Theme.localFill : Color.white)))
@@ -341,9 +341,9 @@ struct StatusPill: View {
     var body: some View {
         let (text, fg, dot, bg): (String, Color, Color, Color) = {
             switch status {
-            case .connected: return ("已连接", Theme.greenText, Theme.green, Theme.greenBG)
-            case .searching: return ("正在寻找对方", Theme.amber, Theme.amber, Theme.amberBG)
-            case .offline: return ("对方不在线", Theme.sub, Theme.sub, Theme.offlineBG)
+            case .connected: return (L.linkStatusShort(status), Theme.greenText, Theme.green, Theme.greenBG)
+            case .searching: return (L.linkStatusShort(status), Theme.amber, Theme.amber, Theme.amberBG)
+            case .offline: return (L.linkStatusShort(status), Theme.sub, Theme.sub, Theme.offlineBG)
             }
         }()
         return HStack(spacing: 6) {
@@ -372,23 +372,22 @@ struct LinkInfoDialog: View {
         let close = { model.dialog = nil }
         switch model.linkStatus {
         case .searching:
-            StateDialog(title: "正在寻找对方",
-                        message: "已配对「\(model.peerName)」\n正在自动重连，无需重新配对。",
-                        note: "关闭后继续在后台重连。", onClose: close) {
-                Button("返回设备连接", action: close).buttonStyle(DialogButton())
+            StateDialog(title: L.searchingTitle,
+                        message: L.searchingMessage(model.peerName),
+                        note: L.searchingNote, onClose: close) {
+                Button(L.backToDevices, action: close).buttonStyle(DialogButton())
             }
         case .offline:
-            StateDialog(title: "对方不在线",
-                        message: "无法连接「\(model.peerName)」。\n请确认对方已开机、MacKVM 正在运行，且处于同一局域网。",
-                        note: "对方上线后自动连接。", onClose: close) {
-                Button("知道了", action: close).buttonStyle(DialogButton())
+            StateDialog(title: L.offlineTitle,
+                        message: L.offlineMessage(model.peerName),
+                        note: L.offlineNote, onClose: close) {
+                Button(L.gotIt, action: close).buttonStyle(DialogButton())
             }
         case .connected:
-            StateDialog(title: "已连接",
-                        message: "已与「\(model.peerName)」建立加密连接。\n"
-                            + (model.isController ? "本机正在操作对方。" : "本机由对方操作。"),
-                        note: "断线后会自动重连，无需重新配对。", onClose: close) {
-                Button("知道了", action: close).buttonStyle(DialogButton())
+            StateDialog(title: L.connectedTitle,
+                        message: L.connectedMessage(model.peerName, controller: model.isController),
+                        note: L.connectedNote, onClose: close) {
+                Button(L.gotIt, action: close).buttonStyle(DialogButton())
             }
         }
     }
@@ -398,14 +397,12 @@ struct UnpairConfirmDialog: View {
     @EnvironmentObject var model: AppModel
 
     var body: some View {
-        StateDialog(title: "解除与「\(model.peerName)」的配对？",
-                    message: model.linkStatus == .connected
-                        ? "解除后，两台都会回到未配对状态。\n再次使用时需要重新配对。"
-                        : "解除后，两台都会回到未配对状态（对方现在不在线，上线后自动同步）。\n再次使用时需要重新配对。",
+        StateDialog(title: L.unpairTitle(model.peerName),
+                    message: L.unpairMessage(peerOnline: model.linkStatus == .connected),
                     onClose: { model.dialog = nil }) {
-            Button("取消") { model.dialog = nil }
+            Button(L.cancel) { model.dialog = nil }
                 .buttonStyle(KVMButtonStyle(kind: .grey, size: 12, padV: 6, padH: 12, radius: 6))
-            Button("解除配对") { model.dialogAction(.confirmUnpair) { model.confirmUnpair() } }
+            Button(L.unpair) { model.dialogAction(.confirmUnpair) { model.confirmUnpair() } }
                 .buttonStyle(KVMButtonStyle(kind: .danger, size: 12, padV: 6, padH: 12, radius: 6))
         }
     }
@@ -417,14 +414,12 @@ struct SwapConfirmDialog: View {
     var body: some View {
         // 本机现在是输入设备 → 要把对方设为输入设备；反之把本机设为输入设备
         let peerBecomesInput = model.isController
-        StateDialog(title: peerBecomesInput ? "将「\(model.peerName)」设为输入设备？" : "将本机设为输入设备？",
-                    message: peerBecomesInput
-                        ? "请将键盘和鼠标接到「\(model.peerName)」。\n确认后，本机将由它控制。"
-                        : "请将键盘和鼠标接到本机。\n确认后，本机将控制「\(model.peerName)」。",
+        StateDialog(title: L.swapTitle(model.peerName, peerBecomesInput: peerBecomesInput),
+                    message: L.swapMessage(model.peerName, peerBecomesInput: peerBecomesInput),
                     onClose: { model.dialog = nil }) {
-            Button("取消") { model.dialog = nil }
+            Button(L.cancel) { model.dialog = nil }
                 .buttonStyle(KVMButtonStyle(kind: .grey, size: 12, padV: 6, padH: 12, radius: 6))
-            Button("确认切换") { model.dialogAction(.confirmSwap) { model.confirmSwap() } }
+            Button(L.swapConfirm) { model.dialogAction(.confirmSwap) { model.confirmSwap() } }
                 .buttonStyle(KVMButtonStyle(size: 12, padV: 6, padH: 12, radius: 6))
         }
     }

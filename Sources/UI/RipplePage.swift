@@ -17,15 +17,15 @@ struct RipplePage: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("让光标的去向清晰可见").font(.ui(26, .semibold)).lh(26).foregroundStyle(Theme.text)
-                    Text("跨设备时显示波纹 · 修改立即生效，并同步到另一台")
+                    Text(L.rippleTitle).font(.ui(26, .semibold)).lh(26).foregroundStyle(Theme.text)
+                    Text(L.rippleSubtitle)
                         .font(.ui(13)).lh(13).foregroundStyle(Theme.sub)
                 }
                 Spacer()
-                Button("恢复默认值") { model.resetRipple() }
+                Button(L.rippleReset) { model.resetRipple() }
                     .buttonStyle(KVMButtonStyle(kind: .secondary, padV: 9, padH: 16))
                     .disabled(!r.enabled)
-                Text(r.enabled ? "已开启" : "已关闭").font(.ui(12)).lh(12).foregroundStyle(Theme.sub)
+                Text(L.rippleSwitchState(r.enabled)).font(.ui(12)).lh(12).foregroundStyle(Theme.sub)
                 KVMSwitch(on: r.enabled) { v in
                     if !v { ColorPanelController.shared.close() }
                     model.updateRipple { $0.enabled = v }
@@ -34,7 +34,7 @@ struct RipplePage: View {
             .frame(height: 64)
             PreviewCards(preview: model.ripplePreview)
                 .frame(maxHeight: .infinity)
-            Text("鼠标越过两张卡片中间的分界线即可体验波纹；进入波纹至少持续 \(seconds(r.minDuration)) 秒，停下 \(seconds(r.idleStop)) 秒后停止出环，最长 \(seconds(r.maxDuration)) 秒。")
+            Text(L.rippleFootnote(min: seconds(r.minDuration), idle: seconds(r.idleStop), max: seconds(r.maxDuration)))
                 .font(.ui(12)).lh(12).foregroundStyle(Theme.sub).lineLimit(1)
                 .frame(height: 40)
         }
@@ -57,15 +57,15 @@ private struct PreviewCards: View {
         GeometryReader { geo in
             let w = (geo.size.width - kCardGap) / 2
             HStack(spacing: kCardGap) {
-                ParamCard(side: .left, title: "离开波纹", note: "光标离开一块屏幕时，在离开位置向外扩散出环",
-                          rows: [("环的大小", \.leaveSize), ("每个环的时长", \.leaveDuration),
-                                 ("出环间隔", \.leaveInterval), ("持续时间", \.leaveTotal)],
+                ParamCard(side: .left, title: L.leaveRipple, note: L.leaveRippleNote,
+                          rows: [(L.ringSize, \.leaveSize), (L.ringDuration, \.leaveDuration),
+                                 (L.ringInterval, \.leaveInterval), (L.leaveTotal, \.leaveTotal)],
                           showColors: true, preview: preview)
                     .frame(width: w)
-                ParamCard(side: .right, title: "进入波纹", note: "光标进入一块屏幕时，沿移动轨迹连续出环",
-                          rows: [("环的大小", \.arriveSize), ("每个环的时长", \.arriveDuration),
-                                 ("出环间隔", \.spawnInterval), ("至少持续", \.minDuration),
-                                 ("停下判定时间", \.idleStop), ("最长持续", \.maxDuration)],
+                ParamCard(side: .right, title: L.arriveRipple, note: L.arriveRippleNote,
+                          rows: [(L.ringSize, \.arriveSize), (L.ringDuration, \.arriveDuration),
+                                 (L.ringInterval, \.spawnInterval), (L.minDuration, \.minDuration),
+                                 (L.idleStop, \.idleStop), (L.maxDuration, \.maxDuration)],
                           showColors: false, preview: preview)
                     .frame(width: w)
             }
@@ -113,11 +113,11 @@ private struct ParamCard: View {
                     }
                 }
                 if showColors {
-                    Text("波纹颜色").font(.ui(16, .semibold)).foregroundStyle(Theme.text)
+                    Text(L.rippleColors).font(.ui(16, .semibold)).foregroundStyle(Theme.text)
                         .frame(height: 29, alignment: .leading)
                     HStack(spacing: 12) {
-                        ColorGroup(label: "离开波纹", keyPath: \.leaveColors)
-                        ColorGroup(label: "进入波纹", keyPath: \.arriveColors)
+                        ColorGroup(label: L.leaveRipple, keyPath: \.leaveColors)
+                        ColorGroup(label: L.arriveRipple, keyPath: \.arriveColors)
                     }
                     .frame(height: 29)
                 }
@@ -196,9 +196,9 @@ private struct ColorGroup: View {
                     swatchBox(fill: .white) { Circle().fill(Color(cgColor: cgColor(hex: hex))).frame(width: 12, height: 12) }
                 }
                 .buttonStyle(.plain)
-                .help("点按修改颜色；右键可删除")
+                .help(L.colorSwatchHelp)
                 .contextMenu {
-                    Button("删除这个颜色") {
+                    Button(L.colorDelete) {
                         model.updateRipple { r in
                             if r[keyPath: keyPath].count > 1, i < r[keyPath: keyPath].count {
                                 r[keyPath: keyPath].remove(at: i)
@@ -227,7 +227,7 @@ private struct ColorGroup: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .help("添加颜色")
+                .help(L.colorAdd)
             }
         }
     }
@@ -252,7 +252,7 @@ private struct ParamStepper: View {
     private var value: Double { model.ripple[keyPath: keyPath] }
 
     private func display(_ v: Double) -> String {
-        spec.isSeconds ? "\(seconds(v)) 秒" : seconds(v)
+        spec.isSeconds ? L.secondsValue(seconds(v)) : seconds(v)
     }
 
     private func commit() {
@@ -312,6 +312,6 @@ struct KVMSwitch: View {
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .help(on ? "关闭光标特效" : "开启光标特效")
+        .help(L.rippleSwitchHelp(on))
     }
 }

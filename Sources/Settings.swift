@@ -2,7 +2,8 @@
 //   - 本机设备 ID（第一次启动时随机生成，之后不变）；
 //   - 配对记录：对方设备 ID、对方设备名、长期密钥、上次连上对方的 IPv4 地址；
 //   - 共享设置 SharedSettings：谁是主控、屏幕布局和相邻规则、波纹参数，带修订号，两台按修订号取新的；
-//   - 待通知的解除配对：本机解除配对时对方不在线，就先记着，等对方上线再告诉它。
+//   - 待通知的解除配对：本机解除配对时对方不在线，就先记着，等对方上线再告诉它；
+//   - 界面语言（用户手动切过才记，只存本机，不在两台之间同步）。
 // 全部写在 ~/Library/Application Support/MacKVM/state.json（目录 700、文件 600，里面有密钥）。
 // 环境变量 MACKVM_HOME 可以把目录换掉，只给自测用。
 
@@ -243,6 +244,7 @@ struct PersistedState: Codable {
     var pendingUnpair: PairingRecord?           // 解除配对时对方不在线：记着，等它上线再通知
     var peerScreens: [ScreenInfo]?              // 对方上次发来的屏幕清单（离线时界面用它）
     var knownScreens: [ScreenInfo]?             // 两台见过的所有屏幕（拔掉的屏在界面上还能显示名字和尺寸）
+    var language: Language?                     // 界面语言：用户手动切过才有；nil = 跟系统。只存本机，不同步
 
     init(deviceID: String) { self.deviceID = deviceID }
 }
