@@ -367,6 +367,7 @@ final class ControlledRole {
         switch e.type {
         case .scrollWheel:
             e.location = pos
+            prepareScrollWheel(e)
         case .keyDown:
             heldKeys.insert(kc)
             flags = e.flags.intersection(modifierMask)
@@ -386,6 +387,27 @@ final class ControlledRole {
             break
         }
         e.post(tap: .cghidEventTap)
+    }
+
+    // 主控在远端状态下吞掉了修饰键事件，所以主控系统生成的滚轮事件本身不带修饰键 flags，也不会在按住 Shift 时把纵向轴换成横向轴。
+    // 这里把本机已同步的修饰键 flags 贴回滚轮事件；若按住 Shift 且只有纵向滚动量（a2 全为 0），则把纵向轴（Axis1）移到横向轴（Axis2）。
+    func prepareScrollWheel(_ e: CGEvent) {
+        e.flags = e.flags.subtracting(modifierMask).union(flags)
+        guard flags.contains(.maskShift) else { return }
+        let l1 = e.getIntegerValueField(.scrollWheelEventDeltaAxis1)
+        let l2 = e.getIntegerValueField(.scrollWheelEventDeltaAxis2)
+        let p1 = e.getIntegerValueField(.scrollWheelEventPointDeltaAxis1)
+        let p2 = e.getIntegerValueField(.scrollWheelEventPointDeltaAxis2)
+        let f1 = e.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1)
+        let f2 = e.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2)
+        guard l2 == 0, p2 == 0, f2 == 0, l1 != 0 || p1 != 0 || f1 != 0 else { return }
+        // CoreGraphics 写 DeltaAxis 时会重算 FixedPtDeltaAxis 和 PointDeltaAxis，必须按 Delta → FixedPt → Point 的顺序写
+        e.setIntegerValueField(.scrollWheelEventDeltaAxis1, value: 0)
+        e.setIntegerValueField(.scrollWheelEventDeltaAxis2, value: l1)
+        e.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: 0)
+        e.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2, value: f1)
+        e.setIntegerValueField(.scrollWheelEventPointDeltaAxis1, value: 0)
+        e.setIntegerValueField(.scrollWheelEventPointDeltaAxis2, value: p1)
     }
 
     func postMouse(_ type: CGEventType, _ btn: CGMouseButton, dx: Int64 = 0, dy: Int64 = 0,

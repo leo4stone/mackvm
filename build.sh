@@ -39,7 +39,7 @@ if [ "$IDENTITY" = "-" ]; then
     codesign --force --sign - -i "$BUNDLE_ID" "$APP/Contents/MacOS/MacKVM"
     codesign --force --sign - -i "$BUNDLE_ID" "$APP"
 else
-    echo "== 签名（$IDENTITY，由内向外）"
+    echo "== 签名（${IDENTITY}，由内向外）"
     codesign --force --timestamp --sign "$IDENTITY" -i "$BUNDLE_ID" "$APP/Contents/MacOS/MacKVM"
     codesign --force --timestamp --sign "$IDENTITY" -i "$BUNDLE_ID" "$APP"
 fi

@@ -755,6 +755,43 @@ func unitTests() {
     check(!role.resetInputState("自测：再点一次") && sentMsgs.count == 1, "已经交还后再点：不再发")
     rippleConfig = savedRipple
 
+    print("== 被控方滚轮修饰键与 Shift 横向滚动")
+    func makeScroll(l1: Int64, f1: Double, p1: Int64, l2: Int64 = 0, f2: Double = 0, p2: Int64 = 0) -> CGEvent {
+        let e = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: 0, wheel2: 0, wheel3: 0)!
+        e.flags = CGEventFlags(rawValue: 0x2000_0000)
+        e.setIntegerValueField(.scrollWheelEventDeltaAxis1, value: l1)
+        e.setIntegerValueField(.scrollWheelEventDeltaAxis2, value: l2)
+        e.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: f1)
+        e.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2, value: f2)
+        e.setIntegerValueField(.scrollWheelEventPointDeltaAxis1, value: p1)
+        e.setIntegerValueField(.scrollWheelEventPointDeltaAxis2, value: p2)
+        return e
+    }
+    role.flags = [.maskCommand]
+    let swCmd = makeScroll(l1: 3, f1: 4.0, p1: 38)
+    role.prepareScrollWheel(swCmd)
+    check(swCmd.flags.contains(.maskCommand) && (swCmd.flags.rawValue & 0x2000_0000) != 0
+          && swCmd.getIntegerValueField(.scrollWheelEventPointDeltaAxis1) == 38
+          && swCmd.getIntegerValueField(.scrollWheelEventPointDeltaAxis2) == 0,
+          "未按 Shift（如按 Command）滚动：补齐修饰键 flags、保留非修饰键位，纵向轴不变")
+    role.flags = [.maskShift]
+    let swShift = makeScroll(l1: 3, f1: 4.0, p1: 38)
+    role.prepareScrollWheel(swShift)
+    check(swShift.flags.contains(.maskShift)
+          && swShift.getIntegerValueField(.scrollWheelEventDeltaAxis1) == 0
+          && swShift.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1) == 0
+          && swShift.getIntegerValueField(.scrollWheelEventPointDeltaAxis1) == 0
+          && swShift.getIntegerValueField(.scrollWheelEventDeltaAxis2) == 3
+          && swShift.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2) == 4.0
+          && swShift.getIntegerValueField(.scrollWheelEventPointDeltaAxis2) == 38,
+          "按住 Shift 纵向滚轮：补齐 Shift 标志，并把 line / fixed / point 三组增量完整移到横向轴 Axis2")
+    let swAlreadyH = makeScroll(l1: 2, f1: 2.0, p1: 20, l2: 5, f2: 5.0, p2: 50)
+    role.prepareScrollWheel(swAlreadyH)
+    check(swAlreadyH.getIntegerValueField(.scrollWheelEventPointDeltaAxis1) == 20
+          && swAlreadyH.getIntegerValueField(.scrollWheelEventPointDeltaAxis2) == 50,
+          "已有横向分量的二维滚动：按住 Shift 不覆盖原有的 Axis2")
+    role.flags = []
+
     print("== 后备地址")
     if case .ipv6(let a) = NWEndpoint.Host("fe80::1234:5678:9abc:def0%lo0") {
         check("\(a)".hasPrefix("fe80::1234:5678:9abc:def0"), "带网卡后缀的 IPv6 链路本地地址能解析成 IPv6（\(a)）")
