@@ -167,22 +167,33 @@ func hexColorString(_ rgb: (Double, Double, Double)) -> String {
     return String(format: "#%02X%02X%02X", b(rgb.0), b(rgb.1), b(rgb.2))
 }
 
-// MARK: - 共享设置（两台同步）
+// MARK: - 共享设置（多台同步）
 
-/// 两台存的是同一份：谁是主控、屏幕布局和由它推导出的相邻规则、波纹参数。规则里写的是具体哪台的哪块屏，
-/// 各自用 AdjacencyRule.view(from:) 换算成本机视角，两台不会存反；对调角色时布局和规则都不变。
+/// 设备清单项：让多台协同里的所有设备都知道各台的名字和平台（Mac / Linux）
+struct DeviceSummary: Codable, Equatable {
+    var id: String
+    var name: String
+    var isLaptop: Bool
+    var platform: String?   // nil / "macos" = macOS, "linux" = Linux
+    var isLinux: Bool { platform == "linux" }
+}
+
+/// 共享设置：谁是主控、屏幕布局和由它推导出的相邻规则、波纹参数、已配对设备清单。
+/// 规则里写的是具体哪台的哪块屏，各自用 AdjacencyRule.view(from:) 换算成本机视角；对调角色时布局和规则都不变。
 /// 布局和规则总是一起改：修改的一方从布局算出规则、一起发出去，另一方照单全收，不自己重算。
 struct SharedSettings: Codable, Equatable {
     var revision: UInt64            // 每改一次加 1；同步时取修订号大的
-    var editor: String              // 最后修改者的设备 ID（修订号相同时按它比大小，两台结论一致）
+    var editor: String              // 最后修改者的设备 ID（修订号相同时按它比大小，两边结论一致）
     var controllerID: String        // 主控（键鼠所在那台）的设备 ID
-    var layout: [ScreenSpot] = []   // 屏幕布局：两台每块屏在「设备连接」页上的位置（毫米）
+    var layout: [ScreenSpot] = []   // 屏幕布局：各台每块屏在「设备连接」页上的位置（毫米）
     var rules: [AdjacencyRule] = [] // 屏幕相邻规则（从布局推导）
     var rulesInitialized = false    // 默认布局生成过没有（配对后只生成一次）
     var ripple: RippleConfig
+    var devices: [DeviceSummary] = []
 
     init(revision: UInt64, editor: String, controllerID: String, layout: [ScreenSpot] = [],
-         rules: [AdjacencyRule] = [], rulesInitialized: Bool = false, ripple: RippleConfig) {
+         rules: [AdjacencyRule] = [], rulesInitialized: Bool = false, ripple: RippleConfig,
+         devices: [DeviceSummary] = []) {
         self.revision = revision
         self.editor = editor
         self.controllerID = controllerID
@@ -190,6 +201,7 @@ struct SharedSettings: Codable, Equatable {
         self.rules = rules
         self.rulesInitialized = rulesInitialized
         self.ripple = ripple
+        self.devices = devices
     }
 
     // 自己写解码，兼容旧数据：没有规则字段（更早的版本只有已废弃的 layoutAnchor / layoutOtherIs）按「还没有规则」处理；
@@ -203,6 +215,7 @@ struct SharedSettings: Codable, Equatable {
         rules = try c.decodeIfPresent([AdjacencyRule].self, forKey: .rules) ?? []
         rulesInitialized = try c.decodeIfPresent(Bool.self, forKey: .rulesInitialized) ?? false
         ripple = try c.decodeIfPresent(RippleConfig.self, forKey: .ripple) ?? .defaults
+        devices = try c.decodeIfPresent([DeviceSummary].self, forKey: .devices) ?? []
     }
 
     func isNewer(than o: SharedSettings) -> Bool {
@@ -210,13 +223,20 @@ struct SharedSettings: Codable, Equatable {
         return editor > o.editor
     }
 
-    /// 只认这两台的 ID：对方发来的设置里出现别的 ID 就当它不合法
-    func isValid(me: String, peer: String) -> Bool {
-        let ids: Set<String> = [me, peer]
-        return ids.contains(controllerID) && ids.contains(editor)
+    /// 校验共享设置：controllerID 必须是本机或已直连对端；布局和规则里的设备必须在直连对端或 devices 清单里
+    func isValid(me: String, allowedPeers: Set<String>) -> Bool {
+        let direct = allowedPeers.union([me])
+        var ids = direct
+        for d in devices { ids.insert(d.id) }
+        return direct.contains(controllerID) && ids.contains(editor)
             && rules.allSatisfy { ids.contains($0.aDevice) && ids.contains($0.bDevice) && $0.aDevice != $0.bDevice
                 && $0.offsetMM.isFinite }
             && layout.allSatisfy { ids.contains($0.device) && $0.x.isFinite && $0.y.isFinite }
+    }
+
+    /// 只认这两台的 ID：对方发来的设置里出现别的 ID 就当它不合法
+    func isValid(me: String, peer: String) -> Bool {
+        isValid(me: me, allowedPeers: [peer])
     }
 
     /// 还要不要补生成默认布局
@@ -234,6 +254,19 @@ struct PairingRecord: Codable, Equatable {
     var peerIsLaptop: Bool
     var keyBase64: String
     var lastAddress: String?        // 上次成功连上对方时对方的 IPv4 地址（Bonjour 找不到时的后备）
+    var platform: String? = nil     // nil / "macos" = macOS, "linux" = Linux
+
+    var isLinux: Bool { platform == "linux" }
+
+    init(peerID: String, peerName: String, peerIsLaptop: Bool, keyBase64: String,
+         lastAddress: String?, platform: String? = nil) {
+        self.peerID = peerID
+        self.peerName = peerName
+        self.peerIsLaptop = peerIsLaptop
+        self.keyBase64 = keyBase64
+        self.lastAddress = lastAddress
+        self.platform = platform
+    }
 
     var key: SymmetricKey? {
         guard let d = Data(base64Encoded: keyBase64), d.count == 32 else { return nil }
@@ -246,10 +279,13 @@ struct PairingRecord: Codable, Equatable {
 struct PersistedState: Codable {
     var deviceID: String
     var pairing: PairingRecord?
+    var pairings: [PairingRecord]? = nil
     var shared: SharedSettings?
     var ripple: RippleConfig = .defaults        // 本机保留的一份波纹参数：配对时作为初值，解除配对后也不丢
     var pendingUnpair: PairingRecord?           // 解除配对时对方不在线：记着，等它上线再通知
+    var pendingUnpairs: [PairingRecord]? = nil
     var peerScreens: [ScreenInfo]?              // 对方上次发来的屏幕清单（离线时界面用它）
+    var peerScreensByDevice: [String: [ScreenInfo]]? = nil
     var knownScreens: [ScreenInfo]?             // 两台见过的所有屏幕（拔掉的屏在界面上还能显示名字和尺寸）
     var language: Language?                     // 界面语言：用户手动切过才有；nil = 跟系统。只存本机，不同步
 

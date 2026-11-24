@@ -222,10 +222,11 @@ final class ControlledRole {
 
     // MARK: 状态切换
 
-    /// 交还主控：带上落点（主控哪块屏、哪条边、第几毫米）；hit 为 nil 时让主控回到它跨出来的位置
+    /// 交还主控（或经主控切往另一台被控）：带上目标设备、屏、边、毫米；hit 为 nil 时让主控回到它跨出来的位置
     func sendLeave(_ hit: CrossingHit?) {
         var d = Data()
-        if let hit, let j = try? JSONEncoder().encode(CrossPayload(screen: hit.remoteScreen, edge: hit.remoteEdge,
+        if let hit, let j = try? JSONEncoder().encode(CrossPayload(device: hit.remoteDevice.isEmpty ? nil : hit.remoteDevice,
+                                                                   screen: hit.remoteScreen, edge: hit.remoteEdge,
                                                                    mm: hit.remoteMM)) {
             d = j
         }
@@ -310,7 +311,8 @@ final class ControlledRole {
                          sinceEnter: Date().timeIntervalSince(enteredAt), outwardOnPending: outward),
            let h = hit {
             sendLeave(h)
-            deactivate(reason: "光标从规则 \(h.ruleID.prefix(8)) 的\(h.localEdge.edgeLabel)段推出，交还主控（对方屏\(h.remoteEdge.edgeLabel) \(fmt(h.remoteMM)) 毫米）")
+            let dest = h.remoteDevice.isEmpty ? "主控" : "目标设备 \(h.remoteDevice.prefix(8))"
+            deactivate(reason: "光标从规则 \(h.ruleID.prefix(8)) 的\(h.localEdge.edgeLabel)段推出，交给\(dest)（对方屏\(h.remoteEdge.edgeLabel) \(fmt(h.remoteMM)) 毫米）")
             return
         }
         var n = CGPoint(x: pos.x + dx, y: pos.y + dy)

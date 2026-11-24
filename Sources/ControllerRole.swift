@@ -131,15 +131,20 @@ enum LocalLanding: Equatable {
 }
 
 final class ControllerRole {
-    /// 当前连着的对方（通过了密钥校验）；nil 表示不在线
-    let peer: () -> Peer?
-    /// 当前生效的相邻规则（本机视角）和两台屏幕信息（随时可能变，每次用时现取）
+    let myID: String
+    /// 按设备 ID 取已认证的连接；nil 表示该设备不在线
+    let peerFor: (String) -> Peer?
+    /// 该对端是不是 Linux 设备（Linux 走平台无关的 key / scroll 消息，Mac 走 CGEvent 序列化）
+    let peerIsLinux: (String) -> Bool
+    /// 当前生效的相邻规则（本机视角）和全部设备屏幕信息（随时可能变，每次用时现取）
     let map: () -> CrossingMap
 
     var tap: CFMachPort?
     var tapSource: CFRunLoopSource?
     var stopped = false
-    var remote = false              // false = 本地状态，true = 远端状态
+    var activePeerID: String?       // nil = 本地状态；非 nil = 当前正控制这台被控设备
+    var remote: Bool { activePeerID != nil }
+    var activePeer: Peer? { activePeerID.flatMap(peerFor) }
     var cursorHidden = false        // 本机光标是否被这里隐藏着（主屏 hide 一次，show 时配平一次）
     var center = CGPoint.zero       // 远端状态下藏着的光标停的位置（主屏中心）
     var motion = RemoteDelta()
@@ -148,10 +153,14 @@ final class ControllerRole {
     var transitionSeq = 0           // 每次切换加 1，进入波纹的后续环据此判断「还是不是这次进入」
     var lastLocalAt = Date.distantPast
     var fracX: CGFloat = 0, fracY: CGFloat = 0   // 发给对方的位移只能是整数，小数部分攒着
+    var lastCapsLockOn = false
     let suppressSource = CGEventSource(stateID: .combinedSessionState)
 
-    init(peer: @escaping () -> Peer?, map: @escaping () -> CrossingMap) {
-        self.peer = peer
+    init(myID: String, peerFor: @escaping (String) -> Peer?,
+         peerIsLinux: @escaping (String) -> Bool, map: @escaping () -> CrossingMap) {
+        self.myID = myID
+        self.peerFor = peerFor
+        self.peerIsLinux = peerIsLinux
         self.map = map
     }
 
@@ -170,7 +179,7 @@ final class ControllerRole {
     func stop() {
         guard !stopped else { return }
         if remote {
-            peer()?.send(.release)
+            activePeer?.send(.release)
             goLocal(.exitPoint, reason: "主控角色停止")
         }
         stopped = true
@@ -187,25 +196,46 @@ final class ControllerRole {
 
     // MARK: 连接事件（AppModel 转过来）
 
-    func peerOnline(replaced: Bool) {
-        if remote { goLocal(.exitPoint, reason: "对方重新连上（安全兜底）") }
+    func peerOnline(peerID: String, replaced: Bool) {
+        if activePeerID == peerID { goLocal(.exitPoint, reason: "对方重新连上（安全兜底）") }
         let n = map().activeViews.count
-        log(n > 0 ? "对方在线：\(n) 条相邻规则生效，光标从规则边段推出即可切到对方" : "对方在线，但没有生效的相邻规则：光标现在跨不到另一台")
+        log(n > 0 ? "对端在线（\(peerID.prefix(8))）：\(n) 条相邻规则生效，光标从规则边段推出即可切到对方"
+                  : "对端在线（\(peerID.prefix(8))），当前没有生效的相邻规则")
     }
 
-    func peerOffline() {
-        if remote { goLocal(.exitPoint, reason: "对方断线（安全兜底）") }
+    func peerOffline(peerID: String) {
+        if activePeerID == peerID { goLocal(.exitPoint, reason: "对方断线（安全兜底）") }
     }
 
-    func message(_ t: Msg, _ d: Data) {
+    func message(from peerID: String, _ t: Msg, _ d: Data) {
         switch t {
         case .leave:
-            guard remote else {
-                log("收到 leave，但当前已是本地状态，忽略")
+            guard activePeerID == peerID else {
+                log("收到来自 \(peerID.prefix(8)) 的 leave，但当前不在控制它，忽略")
                 return
             }
-            let landing = LocalLanding.forLeave(d)
-            goLocal(landing, reason: landing == .mainCenter ? "对方发来空载荷 leave：被控那台重置了键鼠状态" : "对方发来 leave")
+            if d.isEmpty {
+                goLocal(.mainCenter, reason: "对方发来空载荷 leave：被控那台重置了键鼠状态")
+                return
+            }
+            guard let payload = try? JSONDecoder().decode(CrossPayload.self, from: d) else {
+                goLocal(.exitPoint, reason: "对方发来 leave")
+                return
+            }
+            if let nextDev = payload.device, !nextDev.isEmpty, nextDev != myID {
+                if let nextPeer = peerFor(nextDev) {
+                    activePeerID = nextDev
+                    fracX = 0
+                    fracY = 0
+                    let forward = CrossPayload(device: nextDev, screen: payload.screen, edge: payload.edge, mm: payload.mm)
+                    nextPeer.send(.enter, (try? JSONEncoder().encode(forward)) ?? Data())
+                    log("远端中转：\(peerID.prefix(8)) → \(nextDev.prefix(8))，落到对方屏「\(payload.screen.prefix(8))」\(payload.edge.edgeLabel) \(fmt(payload.mm)) 毫米")
+                } else {
+                    goLocal(.exitPoint, reason: "目标设备（\(nextDev.prefix(8))）不在线，光标退回本机")
+                }
+                return
+            }
+            goLocal(.payload(payload), reason: "对方发来 leave")
         default:
             log("主控收到意外消息类型 \(t)，忽略")
         }
@@ -254,7 +284,7 @@ final class ControllerRole {
             let f = event.flags
             if f.contains(.maskControl), f.contains(.maskAlternate), f.contains(.maskCommand) {
                 if remote {
-                    peer()?.send(.release)
+                    activePeer?.send(.release)
                     goLocal(.mainCenter, reason: "紧急热键 Ctrl+Option+Cmd+L")
                     return nil
                 }
@@ -275,26 +305,43 @@ final class ControllerRole {
         }
 
         // 远端状态
-        let p = peer()
+        guard let pid = activePeerID, let p = peerFor(pid) else { return nil }
+        let linux = peerIsLinux(pid)
         switch type {
         case .mouseMoved, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged:
-            remoteMove(event)
+            remoteMove(event, to: p)
         case .leftMouseDown, .rightMouseDown, .otherMouseDown,
              .leftMouseUp, .rightMouseUp, .otherMouseUp:
             let down = type == .leftMouseDown || type == .rightMouseDown || type == .otherMouseDown
             let b = event.getIntegerValueField(.mouseEventButtonNumber)
-            p?.send(.button, Data([UInt8(clamping: b), down ? 1 : 0]))
-        case .scrollWheel, .keyDown, .keyUp, .flagsChanged:
-            sendSerialized(event)
+            p.send(.button, Data([UInt8(clamping: b), down ? 1 : 0]))
+        case .scrollWheel:
+            if linux {
+                sendScrollToLinux(event, to: p)
+            } else {
+                sendSerialized(event, to: p)
+            }
+        case .keyDown, .keyUp, .flagsChanged:
+            if linux {
+                sendKeyToLinux(type: type, event: event, to: p)
+            } else {
+                sendSerialized(event, to: p)
+            }
         default:
-            if type.rawValue == 14 { sendSerialized(event) } // NX_SYSDEFINED：媒体键、亮度键等
+            if type.rawValue == 14 { // NX_SYSDEFINED：媒体键、亮度键等
+                if linux {
+                    sendMediaKeyToLinux(event, to: p)
+                } else {
+                    sendSerialized(event, to: p)
+                }
+            }
         }
         return nil
     }
 
     // 远端状态下的鼠标移动。移动量取位移字段：事件里的位置是 HID 自己累加的、会被屏幕边夹住，不能拿位置差算。
     // 藏着的光标本身一直停在主屏中心，不用管它。
-    func remoteMove(_ event: CGEvent) {
+    func remoteMove(_ event: CGEvent, to p: Peer) {
         let field = CGPoint(x: event.getDoubleValueField(.mouseEventDeltaX), y: event.getDoubleValueField(.mouseEventDeltaY))
         let d = motion.next(field: field, loc: event.location, center: center)
         fracX += d.x
@@ -306,23 +353,109 @@ final class ControllerRole {
         var data = Data()
         data.appendBE(Int32(clamping: Int64(sx)))
         data.appendBE(Int32(clamping: Int64(sy)))
-        peer()?.send(.move, data)
+        p.send(.move, data)
     }
 
     func isMouseMove(_ t: CGEventType) -> Bool {
         t == .mouseMoved || t == .leftMouseDragged || t == .rightMouseDragged || t == .otherMouseDragged
     }
 
-    func sendSerialized(_ event: CGEvent) {
+    func sendSerialized(_ event: CGEvent, to p: Peer) {
         guard let d = event.data else {
             log("警告：事件序列化失败，类型 \(event.type.rawValue)")
             return
         }
-        peer()?.send(.event, d as Data)
+        p.send(.event, d as Data)
+    }
+
+    // MARK: - 跨平台编码（Linux 对端）
+
+    static func encodeKeyEvent(keycode: UInt16, action: UInt8, flags: UInt64) -> Data {
+        var d = Data(capacity: 11)
+        d.appendBE(keycode)
+        d.append(action)
+        d.appendBE(flags)
+        return d
+    }
+
+    static func encodeScrollEvent(dxLine: Int32, dyLine: Int32, dxPoint: Int32, dyPoint: Int32) -> Data {
+        var d = Data(capacity: 16)
+        d.appendBE(dxLine)
+        d.appendBE(dyLine)
+        d.appendBE(dxPoint)
+        d.appendBE(dyPoint)
+        return d
+    }
+
+    /// 按设备相关标志位分辨左右修饰键（比如同时按住左、右 Shift 时松开左边，.maskShift 依然为真，必须看低位设备掩码）
+    static func modifierKeyIsDown(keycode: Int64, flags: CGEventFlags) -> Bool {
+        let deviceBits: [Int64: UInt64] = [
+            59: 0x0001, // 左 Control
+            56: 0x0002, // 左 Shift
+            60: 0x0004, // 右 Shift
+            55: 0x0008, // 左 Command
+            54: 0x0010, // 右 Command
+            58: 0x0020, // 左 Option
+            61: 0x0040, // 右 Option
+            62: 0x2000, // 右 Control
+        ]
+        if let bit = deviceBits[keycode], (flags.rawValue & 0x207F) != 0 {
+            return (flags.rawValue & bit) != 0
+        }
+        if keycode == 57 { return flags.contains(.maskAlphaShift) }
+        if let m = modifierKeyFlags[keycode] { return flags.contains(m) }
+        return false
+    }
+
+    private func sendKeyToLinux(type: CGEventType, event: CGEvent, to p: Peer) {
+        let kc = event.getIntegerValueField(.keyboardEventKeycode)
+        guard kc >= 0, kc <= Int64(UInt16.max) else { return }
+        let code = UInt16(kc)
+        let rawFlags = event.flags.rawValue
+        switch type {
+        case .keyDown:
+            let rep = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
+            p.send(.key, Self.encodeKeyEvent(keycode: code, action: rep ? 2 : 1, flags: rawFlags))
+        case .keyUp:
+            p.send(.key, Self.encodeKeyEvent(keycode: code, action: 0, flags: rawFlags))
+        case .flagsChanged:
+            if kc == 57 {
+                // CapsLock 只在状态变化时在 Linux 侧点按一次（按下+抬起），避免部分键盘松开时的二次触发
+                let on = event.flags.contains(.maskAlphaShift)
+                guard on != lastCapsLockOn else { return }
+                lastCapsLockOn = on
+                p.send(.key, Self.encodeKeyEvent(keycode: code, action: 1, flags: rawFlags))
+                p.send(.key, Self.encodeKeyEvent(keycode: code, action: 0, flags: rawFlags))
+                return
+            }
+            let down = Self.modifierKeyIsDown(keycode: kc, flags: event.flags)
+            p.send(.key, Self.encodeKeyEvent(keycode: code, action: down ? 1 : 0, flags: rawFlags))
+        default:
+            break
+        }
+    }
+
+    private func sendScrollToLinux(_ event: CGEvent, to p: Peer) {
+        let dyLine = Int32(clamping: event.getIntegerValueField(.scrollWheelEventDeltaAxis1))
+        let dxLine = Int32(clamping: event.getIntegerValueField(.scrollWheelEventDeltaAxis2))
+        let dyPoint = Int32(clamping: event.getIntegerValueField(.scrollWheelEventPointDeltaAxis1))
+        let dxPoint = Int32(clamping: event.getIntegerValueField(.scrollWheelEventPointDeltaAxis2))
+        p.send(.scroll, Self.encodeScrollEvent(dxLine: dxLine, dyLine: dyLine, dxPoint: dxPoint, dyPoint: dyPoint))
+    }
+
+    private func sendMediaKeyToLinux(_ event: CGEvent, to p: Peer) {
+        guard let ns = NSEvent(cgEvent: event), ns.type == .systemDefined, ns.subtype.rawValue == 8 else { return }
+        let data1 = ns.data1
+        let keyCode = (data1 & 0xFFFF_0000) >> 16
+        let keyFlags = data1 & 0xFFFF
+        let state = (keyFlags & 0xFF00) >> 8
+        guard state == 0x0A || state == 0x0B else { return }
+        let action: UInt8 = state == 0x0A ? 1 : 0
+        let wireCode = UInt16(0xFF00 | (keyCode & 0xFF))
+        p.send(.key, Self.encodeKeyEvent(keycode: wireCode, action: action, flags: event.flags.rawValue))
     }
 
     func checkCrossing(_ event: CGEvent) {
-        guard peer() != nil else { return }
         // 刚切回本地的 0.15 秒内不往外切：切回时的 warp 会让紧接着的事件带上几千点的假位移，不挡住会来回乒乓
         guard Date().timeIntervalSince(lastLocalAt) > 0.15 else { return }
         let dx = event.getDoubleValueField(.mouseEventDeltaX)
@@ -335,15 +468,19 @@ final class ControllerRole {
         let p0 = lastLoc ?? CGPoint(x: loc.x - dx, y: loc.y - dy)
         let p1 = CGPoint(x: p0.x + amp(dx), y: p0.y + amp(dy))
         guard let hit = map().hit(from: p0, to: p1) else { return }
-        goRemote(hit)
+        let target = hit.remoteDevice
+        guard !target.isEmpty, peerFor(target) != nil else { return }
+        goRemote(hit, targetPeerID: target)
     }
 
     /// 切到远端：重设 SetsCursorInBackground → 隐藏光标 → warp 到主屏中心
-    func goRemote(_ hit: CrossingHit) {
-        remote = true
+    func goRemote(_ hit: CrossingHit, targetPeerID: String) {
+        guard let targetPeer = peerFor(targetPeerID) else { return }
+        activePeerID = targetPeerID
         exitPoint = hit.crossPoint
-        let payload = CrossPayload(screen: hit.remoteScreen, edge: hit.remoteEdge, mm: hit.remoteMM)
-        peer()?.send(.enter, (try? JSONEncoder().encode(payload)) ?? Data())
+        lastCapsLockOn = CGEventSource.flagsState(.hidSystemState).contains(.maskAlphaShift)
+        let payload = CrossPayload(device: targetPeerID, screen: hit.remoteScreen, edge: hit.remoteEdge, mm: hit.remoteMM)
+        targetPeer.send(.enter, (try? JSONEncoder().encode(payload)) ?? Data())
         suppressSource?.localEventsSuppressionInterval = 0
         enableBackgroundCursorHiding()
         hideCursor()
@@ -371,7 +508,7 @@ final class ControllerRole {
             guard let self else { return false }
             return self.remote && self.transitionSeq == seq
         })
-        log("切到远端：从规则 \(hit.ruleID.prefix(8)) 的\(hit.localEdge.edgeLabel)段推出，跨出点 (\(Int(hit.crossPoint.x)), \(Int(hit.crossPoint.y)))，本机边上 \(fmt(hit.localMM)) 毫米 → 对方屏\(hit.remoteEdge.edgeLabel) \(fmt(hit.remoteMM)) 毫米")
+        log("切到远端（\(targetPeerID.prefix(8))）：从规则 \(hit.ruleID.prefix(8)) 的\(hit.localEdge.edgeLabel)段推出，跨出点 (\(Int(hit.crossPoint.x)), \(Int(hit.crossPoint.y)))，本机边上 \(fmt(hit.localMM)) 毫米 → 对方屏\(hit.remoteEdge.edgeLabel) \(fmt(hit.remoteMM)) 毫米")
     }
 
     /// 切回本地时把光标放到落点，并让系统 HID 层记的鼠标位置跟着对齐。
@@ -391,7 +528,7 @@ final class ControllerRole {
 
     /// 切回本地（热键、对方发 leave、断线、角色停止都走这里）：warp 到落点 → 显示光标。落点怎么定见 LocalLanding
     func goLocal(_ landing: LocalLanding, reason: String) {
-        remote = false
+        activePeerID = nil
         motion.reset()
         let (p, how) = landing.resolve(exitPoint: exitPoint, mainBounds: CGDisplayBounds(CGMainDisplayID()), screens: map().local)
         warpAndSync(p)

@@ -137,9 +137,7 @@ enum ScreenLayout {
 
     // MARK: 布局 → 规则
 
-    /// 从布局推导相邻规则（按本机 me 的视角算，结果两台通用）：本机每块屏和对方每块屏，沿某条边挨着够 kMinTouchMM 就是一条。
-    /// 同一对屏已有规则时沿用它的 ID 和甲乙方向，新挨上的一对才用 newID 生成 ID。
-    /// 布局里没有、或者不知道尺寸的屏（placed 里没有它）上的规则原样留着，等知道了再说。
+    /// 从布局推导相邻规则（按本机 me 的视角算，两台通用）：本机每块屏和对方每块屏，沿某条边挨着够 kMinTouchMM 就是一条。
     static func rules(from placed: [PlacedScreen], me: String, peer: String, existing: [AdjacencyRule],
                       newID: () -> String) -> [AdjacencyRule] {
         func isPlaced(_ d: String, _ s: String) -> Bool { placed.contains { $0.isSame(d, s) } }
@@ -152,11 +150,82 @@ enum ScreenLayout {
                         || (x.aDevice == peer && x.aScreen == r.info.id && x.bDevice == me && x.bScreen == l.info.id)
                 }
                 let id = old?.id ?? newID()
-                let v = RuleView(ruleID: id, localScreen: l.info.id, localEdge: c.edge, remoteScreen: r.info.id, offsetMM: c.offset)
+                let v = RuleView(ruleID: id, localScreen: l.info.id, localEdge: c.edge,
+                                 remoteDevice: peer, remoteScreen: r.info.id, offsetMM: c.offset)
                 out.append(old.map { $0.updated(with: v, me: me) } ?? AdjacencyRule.make(id: id, me: me, peer: peer, view: v))
             }
         }
         return out
+    }
+
+    /// 多台设备版：任意两台不同设备的屏幕，沿某条边挨着够 kMinTouchMM 就生成一条相邻规则（支持被控 ↔ 被控直接相接）
+    static func rules(from placed: [PlacedScreen], existing: [AdjacencyRule],
+                      newID: () -> String) -> [AdjacencyRule] {
+        func isPlaced(_ d: String, _ s: String) -> Bool { placed.contains { $0.isSame(d, s) } }
+        var out = existing.filter { !isPlaced($0.aDevice, $0.aScreen) || !isPlaced($0.bDevice, $0.bScreen) }
+        for i in placed.indices {
+            let l = placed[i]
+            for j in (i + 1)..<placed.count {
+                let r = placed[j]
+                guard l.device != r.device, let c = crossable(l.rect, r.rect) else { continue }
+                let old = existing.first { x in
+                    (x.aDevice == l.device && x.aScreen == l.info.id && x.bDevice == r.device && x.bScreen == r.info.id)
+                        || (x.aDevice == r.device && x.aScreen == r.info.id && x.bDevice == l.device && x.bScreen == l.info.id)
+                }
+                let id = old?.id ?? newID()
+                let v = RuleView(ruleID: id, localScreen: l.info.id, localEdge: c.edge,
+                                 remoteDevice: r.device, remoteScreen: r.info.id, offsetMM: c.offset)
+                out.append(old.map { $0.updated(with: v, me: l.device) }
+                    ?? AdjacencyRule.make(id: id, me: l.device, peer: r.device, view: v))
+            }
+        }
+        return out
+    }
+
+    /// 把新加入的一台设备的所有屏幕贴到已有布局的最右侧（中点对齐、不重叠）
+    static func appendDevice(_ device: String, screens: [ScreenInfo], to existing: [ScreenSpot],
+                             info: (String, String) -> ScreenInfo?) -> [ScreenSpot] {
+        let remaining = existing.filter { $0.device != device }
+        guard !screens.isEmpty else { return remaining }
+        let cb = arranged(screens)
+        let fixedRects: [CGRect] = remaining.compactMap { sp in
+            info(sp.device, sp.screen).map { CGRect(x: sp.x, y: sp.y, width: $0.mmW, height: $0.mmH) }
+        }
+        guard let anchor = fixedRects.max(by: { $0.maxX < $1.maxX }),
+              let b = outermost(screens, .left), let pb = cb[b.id] else {
+            return remaining + screens.compactMap { s in
+                cb[s.id].map { ScreenSpot(device: device, screen: s.id, x: $0.x, y: $0.y) }
+            }
+        }
+        var dx = anchor.maxX - pb.x
+        let dy = anchor.midY - (pb.y + b.mmH / 2)
+        func rect(_ s: ScreenInfo, _ o: CGPoint) -> CGRect { CGRect(x: o.x, y: o.y, width: s.mmW, height: s.mmH) }
+        for _ in 0...(screens.count * max(1, fixedRects.count)) {
+            let moved = screens.compactMap { s in cb[s.id].map { rect(s, CGPoint(x: $0.x + dx, y: $0.y + dy)) } }
+            var push = 0.0
+            for m in moved {
+                for f in fixedRects where overlaps(f, m) { push = max(push, f.maxX - m.minX) }
+            }
+            if push == 0 { break }
+            dx += push
+        }
+        return remaining + screens.compactMap { s in
+            cb[s.id].map { ScreenSpot(device: device, screen: s.id, x: $0.x + dx, y: $0.y + dy) }
+        }
+    }
+
+    /// 从布局和相邻规则中移除一块不再使用的未连接屏幕；保留其余屏幕的位置及既有规则 ID。
+    static func removing(device: String, screen: String,
+                         from spots: [ScreenSpot], existingRules: [AdjacencyRule],
+                         info: (String, String) -> ScreenInfo?,
+                         newID: () -> String) -> (layout: [ScreenSpot], rules: [AdjacencyRule]) {
+        let layout = spots.filter { !($0.device == device && $0.screen == screen) }
+        let placed = placed(spots: layout, present: [], info: info)
+        let keptRules = existingRules.filter {
+            !(($0.aDevice == device && $0.aScreen == screen) || ($0.bDevice == device && $0.bScreen == screen))
+        }
+        let rules = rules(from: placed, existing: keptRules, newID: newID)
+        return (layout, rules)
     }
 
     // MARK: 补全

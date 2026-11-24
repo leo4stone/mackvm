@@ -127,8 +127,14 @@ final class StatusMenuContent: NSObject, NSMenuDelegate {
             case .searching: color = NSColor(srgbRed: 0x9B / 255.0, green: 0x69 / 255.0, blue: 0x17 / 255.0, alpha: 1)
             case .offline: color = .secondaryLabelColor
             }
-            setInfo(status, styled(L.menuStatus(model.linkStatus, peer: model.peerName), size: 13, color: color))
-            setInfo(role, styled(L.roleLine(controller: model.isController), size: 12, color: .secondaryLabelColor))
+            if model.pairings.count > 1 {
+                let online = model.pairings.filter { model.status(for: $0.peerID) == .connected }.count
+                setInfo(status, styled(L.menuStatusMulti(online: online, total: model.pairings.count), size: 13, color: color))
+                setInfo(role, styled(L.multiRoleLine(count: model.pairings.count), size: 12, color: .secondaryLabelColor))
+            } else {
+                setInfo(status, styled(L.menuStatus(model.linkStatus, peer: model.peerName), size: 13, color: color))
+                setInfo(role, styled(L.roleLine(controller: model.isController), size: 12, color: .secondaryLabelColor))
+            }
             role.isHidden = false
         } else {
             setInfo(status, styled(L.menuUnpaired, size: 13, color: .secondaryLabelColor))

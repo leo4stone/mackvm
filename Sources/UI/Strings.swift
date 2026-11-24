@@ -70,10 +70,17 @@ enum L {
     static func menuStatus(_ s: LinkStatus, peer: String) -> String {
         "● " + linkStatusShort(s) + " · " + peer
     }
+    /// 菜单里的多设备状态行：「● 已连接 2/2」
+    static func menuStatusMulti(online: Int, total: Int) -> String {
+        "● " + multiConnected(online: online, total: total)
+    }
     /// 本机的角色：操作对方 / 被对方操作
     static func roleLine(controller: Bool) -> String {
         controller ? tr("本机操作对方", "This Mac controls the other Mac")
                    : tr("本机被对方操作", "The other Mac controls this Mac")
+    }
+    static func multiRoleLine(count: Int) -> String {
+        tr("本机操作 \(count) 台设备", "Controlling \(count) devices")
     }
 
     // MARK: 连接状态
@@ -186,7 +193,16 @@ enum L {
            "Drag displays to arrange them. Cross at blue shared edges; move them apart to stop crossing.")
     }
     static var statusHelp: String { tr("查看连接状态说明", "Show connection details") }
+    static var addDevice: String { tr("添加设备", "Add device") }
     static var unpair: String { tr("解除配对", "Unpair") }
+    static var linuxTag: String { "Linux" }
+    static func multiConnected(online: Int, total: Int) -> String {
+        tr("已连接 \(online)/\(total)", "Connected \(online)/\(total)")
+    }
+    static var multiLinkInfoTitle: String { tr("已配对设备", "Paired devices") }
+    static var multiLinkInfoNote: String {
+        tr("所有已配对设备都会在后台自动重连，无需重新配对。", "All paired devices reconnect automatically in the background.")
+    }
     static var layoutNoScreens: String {
         tr("还没读到显示器信息，连上对方后会显示。", "No display information yet. It appears once the Macs connect.")
     }
@@ -198,7 +214,15 @@ enum L {
         tr("对方离线：使用上次连接信息，重连后同步。",
            "The other Mac is offline: showing the last known layout. Changes sync when it reconnects.")
     }
+    static func noticeSomeOffline(_ names: [String]) -> String {
+        let joined = names.joined(separator: lang == .zh ? "、" : ", ")
+        return tr("「\(joined)」未在线：使用上次连接信息，重连后同步。",
+                  "\(joined) offline: showing last known layout. Syncs on reconnect.")
+    }
     static var dragHandleHelp: String { tr("拖动摆放这块屏幕", "Drag to arrange this display") }
+    static var removeUnpluggedScreenHelp: String {
+        tr("从布局中移除这块未接上的屏幕", "Remove this unplugged display from the layout")
+    }
     /// 对方屏上的「切换为输入设备」（对调角色）。英文按设计稿分两种：本机是主控时在对方（被控）屏上写「Use as input device」，
     /// 本机是被控时在对方（主控）屏上写「Use This Mac for Input」
     static func swapButton(controller: Bool) -> String {
@@ -369,6 +393,13 @@ enum L {
                  "Both Macs will become unpaired.\nYou will need to pair them again to reconnect.")
             : tr("解除后，两台都会回到未配对状态（对方现在不在线，上线后自动同步）。\n再次使用时需要重新配对。",
                  "Both Macs will become unpaired (the other Mac is offline and will be updated when it comes back).\nYou will need to pair them again to reconnect.")
+    }
+    static func unpairOneMessage(name: String, peerOnline: Bool) -> String {
+        peerOnline
+            ? tr("解除后，将从当前布局移除「\(name)」，其余已配对设备不受影响。\n再次使用时需要重新配对。",
+                 "\(name) will be removed from this layout. Other paired devices stay connected.\nYou will need to pair it again to reconnect.")
+            : tr("解除后，将从当前布局移除「\(name)」（对方现在不在线，上线后自动同步），其余已配对设备不受影响。",
+                 "\(name) will be removed (it is offline and will be updated when back online). Other paired devices stay connected.")
     }
 
     static func swapTitle(_ peer: String, peerBecomesInput: Bool) -> String {

@@ -27,31 +27,103 @@ struct ConnectionPage: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
-                HStack(alignment: .center, spacing: 12) {
+                HStack(alignment: .center, spacing: 10) {
                     Text(L.layoutTitle).font(.ui(26, .semibold)).lh(26).foregroundStyle(Theme.text)
                     Spacer(minLength: 0)
-                    Button { model.dialog = .linkInfo } label: { StatusPill(status: model.linkStatus) }
+                    if model.canAddMoreDevices {
+                        Button { model.openSeek() } label: {
+                            HStack(spacing: 5) {
+                                Image(systemName: "plus").font(.system(size: 11, weight: .semibold))
+                                Text(L.addDevice)
+                            }
+                        }
+                        .buttonStyle(KVMButtonStyle(kind: .secondary, size: 13, weight: .medium, padV: 9, padH: 14))
+                    }
+                    let onlineCount = model.pairings.filter { model.status(for: $0.peerID) == .connected }.count
+                    let pillText = model.pairings.count > 1 ? L.multiConnected(online: onlineCount, total: model.pairings.count) : nil
+                    Button { model.dialog = .linkInfo } label: { StatusPill(status: model.linkStatus, overrideText: pillText) }
                         .buttonStyle(.plain)
                         .help(L.statusHelp)
-                    Button(L.unpair) { model.dialog = .confirmUnpair }
-                        .buttonStyle(KVMButtonStyle(kind: .secondary, size: 13, weight: .medium, padV: 9, padH: 16))
+                    if model.pairings.count <= 1 {
+                        Button(L.unpair) { model.promptUnpair() }
+                            .buttonStyle(KVMButtonStyle(kind: .secondary, size: 13, weight: .medium, padV: 9, padH: 16))
+                    }
                 }
                 .frame(height: 38)
                 Text(L.layoutSubtitle)
                     .font(.ui(13)).lh(13).foregroundStyle(Theme.sub)
             }
             .frame(height: 64)
+            if model.pairings.count > 1 {
+                PeerBar()
+            }
             LayoutPreview()
                 .frame(maxHeight: .infinity)
         }
     }
 }
 
+private struct PeerBar: View {
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(model.pairings, id: \.peerID) { rec in
+                    let st = model.status(for: rec.peerID)
+                    let dot: Color = st == .connected ? Theme.green : (st == .searching ? Theme.amber : Theme.sub)
+                    HStack(spacing: 6) {
+                        Circle().fill(dot).frame(width: 6, height: 6)
+                        Text(rec.peerName).font(.ui(12, .medium)).foregroundStyle(Theme.text).lineLimit(1)
+                        if rec.isLinux {
+                            Text(L.linuxTag)
+                                .font(.ui(10, .medium))
+                                .foregroundStyle(Theme.sub)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 1)
+                                .background(Capsule().fill(Theme.windowBG))
+                        }
+                        Button { model.promptUnpair(rec.peerID) } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(Theme.sub)
+                                .frame(width: 16, height: 16)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .help(L.unpair)
+                    }
+                    .padding(.vertical, 5)
+                    .padding(.leading, 10)
+                    .padding(.trailing, 6)
+                    .background(Capsule().fill(Color.white))
+                    .overlay(Capsule().strokeBorder(Theme.border, lineWidth: 1))
+                }
+            }
+        }
+        .frame(height: 28)
+    }
+}
+
 extension AppModel {
-    /// 两台屏幕的完整标签（带位置后缀，按当前界面语言）；拔掉的屏用见过的信息
+    /// 单台设备的屏幕标签映射（按设备各自算位置后缀，避免不同设备屏幕 ID 相同时冲突）
+    func screenLabel(device: String, screen: ScreenInfo) -> String {
+        let list = screensForDevice(device)
+        if !list.isEmpty, let label = ScreenNaming.labels(list, L.lang)[screen.id] {
+            return label
+        }
+        return L.screenName(screen)
+    }
+
+    /// 兼容旧调用：汇总全部屏幕标签
     var screenLabels: [String: String] {
         var out = ScreenNaming.labels(localScreens, L.lang)
-        for (k, v) in ScreenNaming.labels(peerScreens, L.lang) { out[k] = v }
+        for list in peerScreensByDevice.values {
+            for (k, v) in ScreenNaming.labels(list, L.lang) { out[k] = v }
+        }
+        for list in otherScreensByDevice.values {
+            for (k, v) in ScreenNaming.labels(list, L.lang) { out[k] = v }
+        }
         for (id, s) in knownScreens where out[id] == nil { out[id] = L.screenName(s) }
         return out
     }
@@ -121,7 +193,7 @@ private struct LayoutPreview: View {
                 ForEach(shown, id: \.key) { s in
                     let r = t.rect(s.rect)
                     let dragging = s.key == draggingKey
-                    ScreenCard(screen: s, label: model.screenLabels[s.info.id] ?? L.screenName(s.info), size: r.size,
+                    ScreenCard(screen: s, label: model.screenLabel(device: s.device, screen: s.info), size: r.size,
                                blocked: dragging && isBlocked(s, among: shown))
                         .frame(width: r.width, height: r.height)
                         .position(x: r.midX, y: r.midY)
@@ -207,12 +279,14 @@ private struct LayoutPreview: View {
             }
     }
 
-    /// 本机屏和对方屏挨着够长的每一段
+    /// 任意两台不同设备的屏挨着够长的每一段（包括两台被控之间直接相接）
     private func seams(_ shown: [PlacedScreen]) -> [Seam] {
         var out: [Seam] = []
-        for l in shown where l.device == model.me.id {
-            for r in shown where r.device == model.peerID {
-                guard let c = ScreenLayout.crossable(l.rect, r.rect) else { continue }
+        for i in shown.indices {
+            let l = shown[i]
+            for j in (i + 1)..<shown.count {
+                let r = shown[j]
+                guard l.device != r.device, let c = ScreenLayout.crossable(l.rect, r.rect) else { continue }
                 let a = l.rect, b = r.rect
                 let mm: CGRect
                 switch c.edge {
@@ -232,7 +306,12 @@ private struct LayoutPreview: View {
         if !seams.contains(where: \.active) {
             out.append(L.noticeNoCrossing)
         }
-        if model.linkStatus != .connected {
+        if model.pairings.count > 1 {
+            let offlineNames = model.pairings.filter { model.status(for: $0.peerID) != .connected }.map(\.peerName)
+            if !offlineNames.isEmpty {
+                out.append(L.noticeSomeOffline(offlineNames))
+            }
+        } else if model.linkStatus != .connected {
             out.append(L.noticeOffline)
         }
         return out
@@ -270,22 +349,36 @@ private struct ScreenCard: View {
     let label: String
     let size: CGSize
     let blocked: Bool       // 拖到和别的屏叠在一起的位置（松手会弹回原处）
+    @State private var hoveringRemove = false
+
+    private func remotePalette(for deviceID: String) -> (fill: Color, stroke: Color) {
+        let remotes = model.pairings.map(\.peerID)
+        let idx = remotes.firstIndex(of: deviceID) ?? 0
+        switch idx {
+        case 0: return (.white, Theme.remoteStroke)
+        case 1: return (Color(hex: 0xEAF7F0), Color(hex: 0x78BE98))
+        default: return (Color(hex: 0xF2EFFC), Color(hex: 0x9E8FE0))
+        }
+    }
 
     var body: some View {
         let s = screen.info
         let isLocal = screen.device == model.me.id
         let present = screen.present
-        let isInput = isLocal == model.isController
-        let device = isLocal ? model.me.name : model.peerName
-        let sameDevice = isLocal ? model.localScreens.count : model.peerScreens.count
+        let canRemove = !present && model.canRemoveUnpluggedScreen(device: screen.device, screen: s.id)
+        let isInput = screen.device == model.shared?.controllerID
+        let device = model.deviceName(for: screen.device)
+        let devScreens = model.screensForDevice(screen.device)
+        let sameDevice = devScreens.count
         let sizeLine = L.screenSize(mmW: s.mmW, mmH: s.mmH, inches: s.inches, main: s.isMain && sameDevice > 1,
                                     estimated: s.estimated)
         let who = L.screenOwner(local: isLocal)
         let role = L.screenRole(local: isLocal, present: present, input: isInput)
         let ink = !present ? Theme.sub : (isLocal ? Theme.blue : Theme.sub)
-        // 「切换为输入设备」只放在对方的一块屏上：对方的主屏，主屏没接着就放第一块接着的（设计稿 06 / 06b）
-        let swapScreen = (model.peerScreens.first { $0.isMain } ?? model.peerScreens.first)?.id
-        let showSwap = present && !isLocal && s.id == swapScreen
+        let palette: (fill: Color, stroke: Color) = isLocal ? (Theme.localFill, Theme.localStroke) : remotePalette(for: screen.device)
+        // 「切换为输入设备」仅双 Mac 模式显示，放在对方主屏（设计稿 06 / 06b）
+        let swapScreen = (devScreens.first { $0.isMain } ?? devScreens.first)?.id
+        let showSwap = model.canSwapController && present && !isLocal && s.id == swapScreen
         let swap = Button(L.swapButton(controller: model.isController)) { model.dialog = .confirmSwap }
             .buttonStyle(SwapButtonStyle())
             .fixedSize()
@@ -328,11 +421,28 @@ private struct ScreenCard: View {
                 DragHandle(color: isLocal ? Theme.localStroke : Theme.sub.opacity(0.55))
                     .padding(10)
                     .help(L.dragHandleHelp)
+            } else if canRemove {
+                Button {
+                    model.removeUnpluggedScreen(device: screen.device, screen: s.id)
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(hoveringRemove ? Theme.red : Theme.sub)
+                        .frame(width: 22, height: 22)
+                        .background(RoundedRectangle(cornerRadius: 5).fill(Color.white.opacity(0.9)))
+                        .overlay(RoundedRectangle(cornerRadius: 5)
+                            .strokeBorder(hoveringRemove ? Theme.red.opacity(0.5) : Theme.border, lineWidth: 1))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .onHover { hoveringRemove = $0 }
+                .padding(6)
+                .help(L.removeUnpluggedScreenHelp)
             }
         }
-        .background(RoundedRectangle(cornerRadius: 5).fill(!present ? Theme.unpluggedFill : (isLocal ? Theme.localFill : Color.white)))
+        .background(RoundedRectangle(cornerRadius: 5).fill(!present ? Theme.unpluggedFill : palette.fill))
         .overlay(RoundedRectangle(cornerRadius: 5)
-            .strokeBorder(blocked ? Theme.red : (isLocal && present ? Theme.localStroke : Theme.remoteStroke),
+            .strokeBorder(blocked ? Theme.red : (present ? palette.stroke : Theme.remoteStroke),
                           style: StrokeStyle(lineWidth: blocked ? 1.5 : 1, dash: present ? [] : [5, 4])))
         .contentShape(Rectangle())
     }
@@ -340,13 +450,14 @@ private struct ScreenCard: View {
 
 struct StatusPill: View {
     let status: LinkStatus
+    var overrideText: String? = nil
 
     var body: some View {
         let (text, fg, dot, bg): (String, Color, Color, Color) = {
             switch status {
-            case .connected: return (L.linkStatusShort(status), Theme.greenText, Theme.green, Theme.greenBG)
-            case .searching: return (L.linkStatusShort(status), Theme.amber, Theme.amber, Theme.amberBG)
-            case .offline: return (L.linkStatusShort(status), Theme.sub, Theme.sub, Theme.offlineBG)
+            case .connected: return (overrideText ?? L.linkStatusShort(status), Theme.greenText, Theme.green, Theme.greenBG)
+            case .searching: return (overrideText ?? L.linkStatusShort(status), Theme.amber, Theme.amber, Theme.amberBG)
+            case .offline: return (overrideText ?? L.linkStatusShort(status), Theme.sub, Theme.sub, Theme.offlineBG)
             }
         }()
         return HStack(spacing: 6) {
@@ -367,30 +478,83 @@ struct StatusPill: View {
 
 // MARK: - 08 弹窗：连接状态说明、解除配对、切换输入设备
 
-/// 点连接状态标签才弹出；内容随当前状态变化
+/// 点连接状态标签才弹出；内容随当前状态变化（多设备时展示每台设备状态并支持单独解绑）
 struct LinkInfoDialog: View {
     @EnvironmentObject var model: AppModel
 
     var body: some View {
         let close = { model.dialog = nil }
-        switch model.linkStatus {
-        case .searching:
-            StateDialog(title: L.searchingTitle,
-                        message: L.searchingMessage(model.peerName),
-                        note: L.searchingNote, onClose: close) {
-                Button(L.backToDevices, action: close).buttonStyle(DialogButton())
+        if model.pairings.count > 1 {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .center, spacing: 8) {
+                    Text(L.multiLinkInfoTitle).font(.ui(15, .semibold)).lh(15).foregroundStyle(Theme.text)
+                    Spacer(minLength: 0)
+                    Button(action: close) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Theme.sub)
+                            .frame(width: 28, height: 28)
+                            .background(RoundedRectangle(cornerRadius: 6).fill(Theme.closeBG))
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help(L.close)
+                }
+                VStack(spacing: 8) {
+                    ForEach(model.pairings, id: \.peerID) { rec in
+                        let st = model.status(for: rec.peerID)
+                        let dot: Color = st == .connected ? Theme.green : (st == .searching ? Theme.amber : Theme.sub)
+                        HStack(spacing: 8) {
+                            Circle().fill(dot).frame(width: 7, height: 7)
+                            Text(rec.peerName).font(.ui(13, .medium)).foregroundStyle(Theme.text).lineLimit(1)
+                            if rec.isLinux {
+                                Text(L.linuxTag)
+                                    .font(.ui(10, .medium))
+                                    .foregroundStyle(Theme.sub)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Capsule().fill(Theme.closeBG))
+                            }
+                            Spacer(minLength: 0)
+                            Text(L.linkStatusShort(st)).font(.ui(11)).foregroundStyle(Theme.sub)
+                            Button(L.unpair) { model.promptUnpair(rec.peerID) }
+                                .buttonStyle(KVMButtonStyle(kind: .secondary, size: 11, padV: 4, padH: 9, radius: 5))
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(RoundedRectangle(cornerRadius: 7).fill(Theme.windowBG))
+                    }
+                }
+                Text(L.multiLinkInfoNote).font(.ui(11)).foregroundStyle(Theme.sub)
+                HStack(spacing: 10) {
+                    Spacer(minLength: 0)
+                    Button(L.gotIt, action: close).buttonStyle(DialogButton())
+                }
             }
-        case .offline:
-            StateDialog(title: L.offlineTitle,
-                        message: L.offlineMessage(model.peerName),
-                        note: L.offlineNote, onClose: close) {
-                Button(L.gotIt, action: close).buttonStyle(DialogButton())
-            }
-        case .connected:
-            StateDialog(title: L.connectedTitle,
-                        message: L.connectedMessage(model.peerName, controller: model.isController),
-                        note: L.connectedNote, onClose: close) {
-                Button(L.gotIt, action: close).buttonStyle(DialogButton())
+            .padding(18)
+            .frame(width: 440, alignment: .topLeading)
+            .background(RoundedRectangle(cornerRadius: 10).fill(Color.white))
+            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Theme.border, lineWidth: 1))
+        } else {
+            switch model.linkStatus {
+            case .searching:
+                StateDialog(title: L.searchingTitle,
+                            message: L.searchingMessage(model.peerName),
+                            note: L.searchingNote, onClose: close) {
+                    Button(L.backToDevices, action: close).buttonStyle(DialogButton())
+                }
+            case .offline:
+                StateDialog(title: L.offlineTitle,
+                            message: L.offlineMessage(model.peerName),
+                            note: L.offlineNote, onClose: close) {
+                    Button(L.gotIt, action: close).buttonStyle(DialogButton())
+                }
+            case .connected:
+                StateDialog(title: L.connectedTitle,
+                            message: L.connectedMessage(model.peerName, controller: model.isController),
+                            note: L.connectedNote, onClose: close) {
+                    Button(L.gotIt, action: close).buttonStyle(DialogButton())
+                }
             }
         }
     }
@@ -400,10 +564,16 @@ struct UnpairConfirmDialog: View {
     @EnvironmentObject var model: AppModel
 
     var body: some View {
-        StateDialog(title: L.unpairTitle(model.peerName),
-                    message: L.unpairMessage(peerOnline: model.linkStatus == .connected),
-                    onClose: { model.dialog = nil }) {
-            Button(L.cancel) { model.dialog = nil }
+        let targetID = model.unpairTargetID ?? model.pairings.first?.peerID ?? ""
+        let targetName = model.pairings.first(where: { $0.peerID == targetID })?.peerName ?? model.peerName
+        let online = model.status(for: targetID) == .connected
+        let msg = model.pairings.count > 1
+            ? L.unpairOneMessage(name: targetName, peerOnline: online)
+            : L.unpairMessage(peerOnline: online)
+        StateDialog(title: L.unpairTitle(targetName),
+                    message: msg,
+                    onClose: { model.unpairTargetID = nil; model.dialog = nil }) {
+            Button(L.cancel) { model.unpairTargetID = nil; model.dialog = nil }
                 .buttonStyle(KVMButtonStyle(kind: .grey, size: 12, padV: 6, padH: 12, radius: 6))
             Button(L.unpair) { model.dialogAction(.confirmUnpair) { model.confirmUnpair() } }
                 .buttonStyle(KVMButtonStyle(kind: .danger, size: 12, padV: 6, padH: 12, radius: 6))

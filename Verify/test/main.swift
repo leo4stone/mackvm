@@ -871,6 +871,100 @@ func unitTests() {
     let lgone = LocalLanding.payload(CrossPayload(screen: "拔掉了", edge: .left, mm: 10))
         .resolve(exitPoint: exitPt, mainBounds: mainB, screens: screensUP)
     check(near(lgone.point, exitPt), "落点那块屏已不在本机 → 落回跨出点")
+
+    print("== 多设备布局、同名屏幕防冲突与 Linux 编码")
+    let ubuntu = "dev-ubuntu"
+    let UbuSameID = ScreenInfo(id: "U2720QM", name: "DELL U2720QM (Ubuntu)", isMain: true, isBuiltin: false,
+                               x: 0, y: 0, w: 2048, h: 1152, mmW: 600, mmH: 340, estimated: false)
+    let appended = ScreenLayout.appendDevice(ubuntu, screens: [UbuSameID], to: defLayout) { d, s in
+        if d == ubuntu && s == UbuSameID.id { return UbuSameID }
+        return all[s]
+    }
+    check(appended.count == 4, "appendDevice 在已有两台（共 3 块屏）基础上追加第 3 台设备")
+    if let us = appended.first(where: { $0.device == ubuntu }) {
+        check(approx(us.x, 599 + 507 + 301), "第 3 台紧贴原有最右侧 MacBook 右边（x=\(us.x)）")
+    }
+    let placed3 = ScreenLayout.placed(spots: appended, present: [(studio, U), (studio, P), (book, B), (ubuntu, UbuSameID)]) { d, s in
+        if d == ubuntu && s == UbuSameID.id { return UbuSameID }
+        return all[s]
+    }
+    let rules3 = ScreenLayout.rules(from: placed3, existing: [], newID: { "r3-\(UUID().uuidString.prefix(4))" })
+    check(rules3.contains { ($0.aDevice == studio && $0.bDevice == book) || ($0.aDevice == book && $0.bDevice == studio) }
+          && rules3.contains { ($0.aDevice == book && $0.bDevice == ubuntu) || ($0.aDevice == ubuntu && $0.bDevice == book) },
+          "三台设备自动推导包含主控↔MacBook 与 MacBook↔Ubuntu 相邻规则")
+    let bookMap3 = CrossingMap(views: rules3.compactMap { $0.view(from: book) },
+                               localScreens: [B],
+                               remoteByDevice: [studio: [U, P], ubuntu: [UbuSameID]])
+    let crossRight = bookMap3.hit(from: CGPoint(x: 1510, y: 491), to: CGPoint(x: 1513, y: 491))
+    check(crossRight?.remoteDevice == ubuntu && crossRight?.remoteScreen == "U2720QM",
+          "MacBook 右推跨往 Ubuntu 时，尽管屏幕 ID 与 Studio 同名，仍精确命中 Ubuntu")
+    let crossLeft = bookMap3.hit(from: CGPoint(x: 2, y: 491), to: CGPoint(x: -1, y: 491))
+    check(crossLeft?.remoteDevice == studio && crossLeft?.remoteScreen == "P2319H",
+          "MacBook 左推回到 Studio 的 P2319H")
+    // 校验 SharedSettings 支持第 3 台设备（devices 清单）
+    let devList = [
+        DeviceSummary(id: studio, name: "Studio", isLaptop: false, platform: "macos"),
+        DeviceSummary(id: book, name: "Book", isLaptop: true, platform: "macos"),
+        DeviceSummary(id: ubuntu, name: "Ubuntu", isLaptop: false, platform: "linux"),
+    ]
+    let multiS = SharedSettings(revision: 5, editor: studio, controllerID: studio, layout: appended,
+                                rules: rules3, rulesInitialized: true, ripple: .defaults, devices: devList)
+    check(multiS.isValid(me: book, allowedPeers: [studio]), "被控端校验含第 3 台设备的 SharedSettings：合法")
+    var badMulti = multiS; badMulti.layout.append(ScreenSpot(device: "stranger", screen: "X", x: 0, y: 0))
+    check(!badMulti.isValid(me: book, allowedPeers: [studio]), "布局出现不在 devices 清单里的设备 ID：不合法")
+    // CrossPayload 带 device 往返与旧版无 device 兼容
+    let cpWithDev = CrossPayload(device: ubuntu, screen: "DP-1", edge: .left, mm: 123.5)
+    let cpDecoded = try! JSONDecoder().decode(CrossPayload.self, from: try! JSONEncoder().encode(cpWithDev))
+    check(cpDecoded == cpWithDev, "CrossPayload 带 device 编码解码一致")
+    let cpLegacy = try! JSONDecoder().decode(CrossPayload.self, from: Data(#"{"screen":"DP-1","edge":"left","mm":50}"#.utf8))
+    check(cpLegacy.device == nil && cpLegacy.screen == "DP-1", "旧版无 device 字段的 CrossPayload 正常兼容解码")
+    // Linux 跨平台输入编码与修饰键左右区分
+    let ke = ControllerRole.encodeKeyEvent(keycode: 0x0008, action: 1, flags: 0x0010_0008)
+    check(ke.count == 11 && ke.readBE(0, UInt16.self) == 8 && ke[2] == 1 && ke.readBE(3, UInt64.self) == 0x0010_0008,
+          "Linux 按键报文：11 字节大端编码正确")
+    let se = ControllerRole.encodeScrollEvent(dxLine: 0, dyLine: -10, dxPoint: 0, dyPoint: -103)
+    check(se.count == 16 && se.readBE(4, Int32.self) == -10 && se.readBE(12, Int32.self) == -103,
+          "Linux 滚轮报文：16 字节大端编码正确")
+    // 同时按住左右 Shift 时松开左 Shift（.maskShift 仍为真，但设备左 Shift 位 0x0002 清零）
+    check(ControllerRole.modifierKeyIsDown(keycode: 56, flags: CGEventFlags(rawValue: 0x0002_0002)), "左 Shift 按下判定为真")
+    check(!ControllerRole.modifierKeyIsDown(keycode: 56, flags: CGEventFlags(rawValue: 0x0002_0004)), "右 Shift 按住时松开左 Shift 判定为假")
+    check(ControllerRole.modifierKeyIsDown(keycode: 60, flags: CGEventFlags(rawValue: 0x0002_0004)), "右 Shift 仍按住判定为真")
+
+    print("== 移除未连接屏幕：只删指定设备的块与关联规则")
+    let lookup3: (String, String) -> ScreenInfo? = { d, s in
+        if d == ubuntu && s == UbuSameID.id { return UbuSameID }
+        return all[s]
+    }
+    let bookUbuRule = rules3.first { ($0.aDevice == book && $0.bDevice == ubuntu) || ($0.aDevice == ubuntu && $0.bDevice == book) }
+    let studioBookRule = rules3.first { ($0.aDevice == studio && $0.bDevice == book) || ($0.aDevice == book && $0.bDevice == studio) }
+    let resP = ScreenLayout.removing(device: studio, screen: "P2319H", from: appended, existingRules: rules3,
+                                     info: lookup3, newID: { "r-rm-p" })
+    check(resP.layout.count == 3 && !resP.layout.contains { $0.device == studio && $0.screen == "P2319H" },
+          "移除 studio/P2319H 后仅剩其余 3 块屏")
+    check(resP.rules.count == 1 && resP.rules.first?.id == bookUbuRule?.id,
+          "移除 studio/P2319H 后关联规则一并清除，无关的 book↔ubuntu 规则与 ID 原样保留")
+
+    let resSame = ScreenLayout.removing(device: ubuntu, screen: "U2720QM", from: appended, existingRules: rules3,
+                                        info: lookup3, newID: { "r-rm-u" })
+    check(resSame.layout.count == 3
+          && resSame.layout.contains { $0.device == studio && $0.screen == "U2720QM" }
+          && !resSame.layout.contains { $0.device == ubuntu && $0.screen == "U2720QM" },
+          "移除 ubuntu/U2720QM 时不影响同名同 ID 的 studio/U2720QM")
+    check(resSame.rules.count == 1 && resSame.rules.first?.id == studioBookRule?.id,
+          "移除 ubuntu/U2720QM 后仅清理其关联规则，保留 studio↔book 规则与 ID")
+
+    let ghostSpot = ScreenSpot(device: studio, screen: "OLD", x: -900, y: 0)
+    let ghostRule = AdjacencyRule(id: "r-ghost", aDevice: studio, aScreen: "OLD", aEdge: .left,
+                                  bDevice: book, bScreen: "BUILTIN", offsetMM: 0)
+    let resGhost = ScreenLayout.removing(device: studio, screen: "OLD", from: appended + [ghostSpot],
+                                         existingRules: rules3 + [ghostRule], info: lookup3, newID: { "r-rm-g" })
+    check(resGhost.layout == appended && resGhost.rules.count == rules3.count
+          && !resGhost.rules.contains { $0.id == "r-ghost" },
+          "移除未知尺寸的未连接屏幕时，连带清掉它的孤立规则且保留原有规则")
+
+    let resNoop = ScreenLayout.removing(device: book, screen: "NOT-THERE", from: appended, existingRules: rules3,
+                                        info: lookup3, newID: { "r-rm-noop" })
+    check(resNoop.layout == appended && resNoop.rules == rules3, "移除不存在的屏幕时布局与规则保持不变")
 }
 
 // MARK: - loopback：单进程内配对 + Link
@@ -1015,6 +1109,40 @@ func loopbackTests() {
     check(spin(6) { v6Up }, "按 IPv6 后备地址 ::1 连上")
     check(spin(1) { learned != nil } && learned!.contains(":"), "被连的一方记下了对方的 IPv6 地址 \(learned ?? "nil")")
     v6A.stop(); v6B.stop()
+
+    print("== 多对端 LinkHub：同一端口同时收发两台对端（入站 + 出站）")
+    let hubDev = DeviceIdentity(id: "hub-m-center", name: "主控中心", isLaptop: false)
+    let p1Dev = DeviceIdentity(id: "hub-a-inbound", name: "被控1（入站）", isLaptop: true)   // ID < hub -> p1 主动连 hub
+    let p2Dev = DeviceIdentity(id: "hub-z-outbound", name: "被控2（出站）", isLaptop: false) // ID > hub -> hub 主动连 p2
+    let k1 = SymmetricKey(size: .bits256)
+    let k2 = SymmetricKey(size: .bits256)
+    let hubPort: UInt16 = 24940, p1Port: UInt16 = 24941, p2Port: UInt16 = 24942
+    let hub = LinkHub(me: hubDev, port: hubPort, useBonjour: false)
+    let peer1 = Link(me: p1Dev, peerID: hubDev.id, key: k1, lastAddress: "127.0.0.1",
+                     port: p1Port, peerPort: hubPort, useBonjour: false)
+    let peer2 = Link(me: p2Dev, peerID: hubDev.id, key: k2, lastAddress: nil,
+                     port: p2Port, peerPort: hubPort, useBonjour: false)
+    var hubAuthed: Set<String> = []
+    var hubMsgs: [(String, Msg, Data)] = []
+    hub.onAuthenticated = { id, _ in hubAuthed.insert(id) }
+    hub.onMessage = { id, _, t, d in hubMsgs.append((id, t, d)) }
+    peer1.onMessage = { p, t, d in if t == .enter { p.send(.leave, Data("from-1".utf8)) } }
+    peer2.onMessage = { p, t, d in if t == .enter { p.send(.leave, Data("from-2".utf8)) } }
+    peer2.start()
+    hub.start()
+    hub.setPeers([
+        LinkHub.Entry(peerID: p1Dev.id, name: p1Dev.name, key: k1, lastAddress: "127.0.0.1", port: p1Port),
+        LinkHub.Entry(peerID: p2Dev.id, name: p2Dev.name, key: k2, lastAddress: "127.0.0.1", port: p2Port),
+    ])
+    peer1.start()
+    check(spin(8) { hubAuthed == [p1Dev.id, p2Dev.id] }, "LinkHub 同时与两台对端完成密钥握手（1 入站 + 1 出站）")
+    hub.activePeer(for: p1Dev.id)?.send(.enter, Data())
+    hub.activePeer(for: p2Dev.id)?.send(.enter, Data())
+    check(spin(4) {
+        hubMsgs.contains { $0.0 == p1Dev.id && $0.1 == .leave && $0.2 == Data("from-1".utf8) }
+            && hubMsgs.contains { $0.0 == p2Dev.id && $0.1 == .leave && $0.2 == Data("from-2".utf8) }
+    }, "两台对端的加密通道互相独立收发")
+    peer1.stop(); peer2.stop(); hub.stop()
 }
 
 // MARK: - 07 卡片预览：用真实的出环调度跑一遍

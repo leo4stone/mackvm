@@ -122,6 +122,17 @@ struct PairingResult {
     let peerIsLaptop: Bool
     let key: SymmetricKey
     let peerAddress: String?
+    let platform: String?
+
+    init(peerID: String, peerName: String, peerIsLaptop: Bool, key: SymmetricKey,
+         peerAddress: String?, platform: String? = nil) {
+        self.peerID = peerID
+        self.peerName = peerName
+        self.peerIsLaptop = peerIsLaptop
+        self.key = key
+        self.peerAddress = peerAddress
+        self.platform = platform
+    }
 }
 
 enum PairFailure: Error, Equatable {
@@ -137,6 +148,7 @@ struct PairMsg: Codable {
     var id: String?
     var name: String?
     var laptop: Bool?
+    var platform: String?
     var nonce: String?
     var y: String?
     var mac: String?
@@ -323,6 +335,7 @@ final class PairingInviter {
         var secret: Curve25519.KeyAgreement.PrivateKey?
         var yI: Data?
         var peerLaptop = false
+        var peerPlatform: String? = nil
         let codeAtStart = code
 
         ch.onClose = { [weak self, weak ch] reason in
@@ -346,9 +359,10 @@ final class PairingInviter {
                 guard let y = try? PairingCrypto.x25519(s, g) else { ch.close("基点无效"); return }
                 helloC = hc; helloI = hi; secret = s; yI = y
                 peerLaptop = m.laptop ?? false
+                peerPlatform = m.platform
                 log("配对：对方是「\(name)」（\(id)），等它提交配对码")
                 ch.send(PairMsg(t: "hello", v: 1, id: hi.id, name: hi.name, laptop: self.me.isLaptop,
-                                nonce: b64(hi.nonce), y: b64(y)))
+                                platform: "macos", nonce: b64(hi.nonce), y: b64(y)))
             case "confirm":
                 guard let hc = helloC, let hi = helloI, let s = secret, let yi = yI,
                       let yc = unb64(m.y, 32), let macC = unb64(m.mac, 32) else {
@@ -373,7 +387,7 @@ final class PairingInviter {
                     return
                 }
                 let result = PairingResult(peerID: hc.id, peerName: hc.name, peerIsLaptop: peerLaptop,
-                                           key: keys.longTerm, peerAddress: ch.remoteIP)
+                                           key: keys.longTerm, peerAddress: ch.remoteIP, platform: peerPlatform)
                 ch.send(PairMsg(t: "confirm", mac: b64(PairingCrypto.mac(keys.confirmI, tr)))) { [weak self] in
                     guard let self, !self.stopped else { return }
                     log("配对：配对码校验通过，与「\(hc.name)」配对成功（密钥指纹 \(PairingCrypto.fingerprint(keys.longTerm))）")
@@ -418,6 +432,7 @@ final class PairingSeeker {
         var tr = Data()
         var hi: PairingCrypto.Hello?
         var peerLaptop = false
+        var peerPlatform: String? = nil
 
         func finish(_ r: Result<PairingResult, PairFailure>) {
             guard !finished else { return }
@@ -426,7 +441,7 @@ final class PairingSeeker {
         }
         ch.onReady = { [weak ch] in
             log("配对：已连上 \(endpoint)，发送握手")
-            ch?.send(PairMsg(t: "hello", v: 1, id: hc.id, name: hc.name, laptop: self.me.isLaptop, nonce: b64(hc.nonce)))
+            ch?.send(PairMsg(t: "hello", v: 1, id: hc.id, name: hc.name, laptop: self.me.isLaptop, platform: "macos", nonce: b64(hc.nonce)))
         }
         ch.onClose = { reason in
             finish(.failure(.failed(reason)))
@@ -448,6 +463,7 @@ final class PairingSeeker {
                 let h = PairingCrypto.Hello(id: id, name: name, nonce: nonce)
                 hi = h
                 peerLaptop = m.laptop ?? false
+                peerPlatform = m.platform
                 let g = PairingCrypto.generator(code: code, nonceC: hc.nonce, nonceI: h.nonce, idC: hc.id, idI: h.id)
                 guard let yc = try? PairingCrypto.x25519(s, g), let k = try? PairingCrypto.x25519(s, yi) else {
                     ch.close("密钥交换失败"); return
@@ -469,7 +485,7 @@ final class PairingSeeker {
                     ch.close("对方的确认码不对，可能遭到中间人攻击，放弃配对"); return
                 }
                 let result = PairingResult(peerID: h.id, peerName: h.name, peerIsLaptop: peerLaptop,
-                                           key: ks.longTerm, peerAddress: ch.remoteIP)
+                                           key: ks.longTerm, peerAddress: ch.remoteIP, platform: peerPlatform)
                 log("配对：与「\(h.name)」配对成功（密钥指纹 \(PairingCrypto.fingerprint(ks.longTerm))）")
                 ch.send(PairMsg(t: "done")) { ch.close("完成") }
                 finish(.success(result))

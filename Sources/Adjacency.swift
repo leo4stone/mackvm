@@ -70,10 +70,12 @@ struct AdjacencyRule: Codable, Equatable, Identifiable {
     /// 换成 me 这台的视角；规则不涉及 me 时返回 nil
     func view(from me: String) -> RuleView? {
         if aDevice == me {
-            return RuleView(ruleID: id, localScreen: aScreen, localEdge: aEdge, remoteScreen: bScreen, offsetMM: offsetMM)
+            return RuleView(ruleID: id, localScreen: aScreen, localEdge: aEdge,
+                            remoteDevice: bDevice, remoteScreen: bScreen, offsetMM: offsetMM)
         }
         if bDevice == me {
-            return RuleView(ruleID: id, localScreen: bScreen, localEdge: bEdge, remoteScreen: aScreen, offsetMM: -offsetMM)
+            return RuleView(ruleID: id, localScreen: bScreen, localEdge: bEdge,
+                            remoteDevice: aDevice, remoteScreen: aScreen, offsetMM: -offsetMM)
         }
         return nil
     }
@@ -102,8 +104,19 @@ struct RuleView: Equatable {
     var ruleID: String
     var localScreen: String
     var localEdge: Direction
+    var remoteDevice: String = ""
     var remoteScreen: String
     var offsetMM: Double
+
+    init(ruleID: String, localScreen: String, localEdge: Direction,
+         remoteDevice: String = "", remoteScreen: String, offsetMM: Double) {
+        self.ruleID = ruleID
+        self.localScreen = localScreen
+        self.localEdge = localEdge
+        self.remoteDevice = remoteDevice
+        self.remoteScreen = remoteScreen
+        self.offsetMM = offsetMM
+    }
 
     var remoteEdge: Direction { localEdge.opposite }
 
@@ -120,34 +133,74 @@ struct RuleView: Equatable {
 
 // MARK: - 跨屏判定
 
-/// 一次跨屏：从本机哪块屏、哪条规则出去，落到对方哪块屏哪条边的哪个毫米位置
+/// 一次跨屏：从本机哪块屏、哪条规则出去，落到对方哪台设备、哪块屏哪条边的哪个毫米位置
 struct CrossingHit: Equatable {
     var ruleID: String
     var localScreen: String
     var localEdge: Direction
     var crossPoint: CGPoint         // 连线和边的交点（点坐标，已夹回本机屏内）
     var localMM: Double
+    var remoteDevice: String = ""
     var remoteScreen: String
     var remoteEdge: Direction
     var remoteMM: Double
+
+    init(ruleID: String, localScreen: String, localEdge: Direction, crossPoint: CGPoint, localMM: Double,
+         remoteDevice: String = "", remoteScreen: String, remoteEdge: Direction, remoteMM: Double) {
+        self.ruleID = ruleID
+        self.localScreen = localScreen
+        self.localEdge = localEdge
+        self.crossPoint = crossPoint
+        self.localMM = localMM
+        self.remoteDevice = remoteDevice
+        self.remoteScreen = remoteScreen
+        self.remoteEdge = remoteEdge
+        self.remoteMM = remoteMM
+    }
 }
 
-/// 一组生效的规则（本机视角）+ 两台的屏幕信息。跨屏判定和落点都从这里算。
+/// 一组生效的规则（本机视角）+ 本机和各对端的屏幕信息。跨屏判定和落点都从这里算。
 struct CrossingMap {
     var views: [RuleView]
     var local: [String: ScreenInfo]
     var remote: [String: ScreenInfo]
+    var remoteByDevice: [String: [String: ScreenInfo]]
+    private let usesDeviceMap: Bool
 
     init(views: [RuleView], localScreens: [ScreenInfo], remoteScreens: [ScreenInfo]) {
         self.views = views
         local = Dictionary(localScreens.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         remote = Dictionary(remoteScreens.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        remoteByDevice = [:]
+        usesDeviceMap = false
+    }
+
+    init(views: [RuleView], localScreens: [ScreenInfo], remoteByDevice: [String: [ScreenInfo]]) {
+        self.views = views
+        local = Dictionary(localScreens.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        var byDev: [String: [String: ScreenInfo]] = [:]
+        var flat: [String: ScreenInfo] = [:]
+        for (dev, list) in remoteByDevice {
+            let dict = Dictionary(list.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+            byDev[dev] = dict
+            for (sid, info) in dict where flat[sid] == nil { flat[sid] = info }
+        }
+        self.remoteByDevice = byDev
+        self.remote = flat
+        usesDeviceMap = true
+    }
+
+    func remoteScreen(for v: RuleView) -> ScreenInfo? {
+        if usesDeviceMap {
+            return v.remoteDevice.isEmpty ? remote[v.remoteScreen] : remoteByDevice[v.remoteDevice]?[v.remoteScreen]
+        }
+        return remote[v.remoteScreen]
     }
 
     /// 两块屏都在、并且挨着的长度够的规则才生效
     var activeViews: [RuleView] {
         views.filter { v in
-            guard let l = local[v.localScreen], let r = remote[v.remoteScreen] else { return false }
+            guard let l = local[v.localScreen], let r = remoteScreen(for: v) else { return false }
             let t = v.touch(l, r)
             return t.hi - t.lo >= kMinTouchMM - 0.001
         }
@@ -163,7 +216,7 @@ struct CrossingMap {
         var best: (t: Double, hit: CrossingHit)?
         let still = p1 == p0
         for v in activeViews {
-            guard let s = local[v.localScreen], let r = remote[v.remoteScreen] else { continue }
+            guard let s = local[v.localScreen], let r = remoteScreen(for: v) else { continue }
             let f = s.frame, u = s.usableFrame
             guard p0.x >= f.minX - 0.5, p0.x <= f.maxX, p0.y >= f.minY - 0.5, p0.y <= f.maxY else { continue }
             let e = v.localEdge
@@ -199,7 +252,7 @@ struct CrossingMap {
                 cp = CGPoint(x: e == .right ? u.maxX - 1 : u.minX, y: min(max(along, u.minY), u.maxY - 1))
             }
             let hit = CrossingHit(ruleID: v.ruleID, localScreen: s.id, localEdge: e, crossPoint: cp, localMM: mm,
-                                  remoteScreen: r.id, remoteEdge: v.remoteEdge,
+                                  remoteDevice: v.remoteDevice, remoteScreen: r.id, remoteEdge: v.remoteEdge,
                                   remoteMM: min(max(v.remoteMM(fromLocal: mm), 0), r.edgeLengthMM(v.remoteEdge)))
             if best == nil || t < best!.t { best = (t, hit) }
         }
@@ -279,9 +332,17 @@ enum ScreenNaming {
 
 // MARK: - 跨屏消息负载
 
-/// enter / leave 消息的内容：落到收方哪块屏、哪条边、沿边第几毫米
+/// enter / leave 消息的内容：落到目标设备（跨设备中转时带 device）、哪块屏、哪条边、沿边第几毫米
 struct CrossPayload: Codable, Equatable {
+    var device: String? = nil
     var screen: String
     var edge: Direction
     var mm: Double
+
+    init(device: String? = nil, screen: String, edge: Direction, mm: Double) {
+        self.device = device
+        self.screen = screen
+        self.edge = edge
+        self.mm = mm
+    }
 }

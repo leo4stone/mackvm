@@ -23,8 +23,11 @@ enum Msg: UInt8 {
     case release = 8    // 主控 → 被控：主控用热键 Ctrl+Option+Cmd+L 强制收回，被控退出活动状态
     case settings = 9   // 双向：共享设置（JSON，见 Settings.swift 的 SharedSettings）
     case unpair = 10    // 双向：对方解除了配对，收到的一方也清除配对
-    case info = 11      // 双向：本机信息（JSON：设备 ID、设备名、是否笔记本），连上后各发一次
+    case info = 11      // 双向：本机信息（JSON：设备 ID、设备名、是否笔记本、平台），连上后各发一次
     case screens = 12   // 双向：本机屏幕清单（JSON [ScreenInfo]），连上后、屏幕变化时发
+    case allScreens = 13 // 主控 → 被控：全局各设备屏幕清单（JSON [String: [ScreenInfo]]）
+    case key = 14       // 主控 → Linux：UInt16 macKeyCode BE + UInt8 action (0=up,1=down,2=repeat) + UInt64 flags BE
+    case scroll = 15    // 主控 → Linux：Int32 dxLine BE + Int32 dyLine BE + Int32 dxPoint BE + Int32 dyPoint BE
 }
 
 /// 连接对端的 IP：IPv4 去掉网卡后缀；IPv6 保留「%网卡」（链路本地地址要靠它才连得上）。
@@ -78,6 +81,12 @@ final class Peer {
     /// 连接对端的 IP 地址（连上之后才有），用来记住「上次成功的地址」作 Bonjour 的后备
     var remoteIP: String? { remoteIPString(conn) }
 
+    /// 试着用指定密钥解开一帧密文；解不开返回 nil（给 LinkHub 识别连入的对端是谁）
+    static func tryOpen(_ frame: Data, using key: SymmetricKey) -> Data? {
+        guard let box = try? ChaChaPoly.SealedBox(combined: frame) else { return nil }
+        return try? ChaChaPoly.open(box, using: key)
+    }
+
     func start() {
         lastRecv = Date()
         conn.stateUpdateHandler = { [weak self] st in self?.stateChanged(st) }
@@ -87,6 +96,22 @@ final class Peer {
         t.setEventHandler { [weak self] in self?.tick() }
         t.resume()
         timer = t
+    }
+
+    /// 已被 LinkHub 读取首帧识别对端后接管连接（conn 已处于 ready 并已 start）
+    func startAccepted(initialBuffer: Data) {
+        lastRecv = Date()
+        conn.stateUpdateHandler = { [weak self] st in self?.stateChanged(st) }
+        let t = DispatchSource.makeTimerSource(queue: .main)
+        t.schedule(deadline: .now() + 1, repeating: 1)
+        t.setEventHandler { [weak self] in self?.tick() }
+        t.resume()
+        timer = t
+        if verbose { log("TCP 已建立：\(name)") }
+        send(.hello)
+        buffer.append(initialBuffer)
+        parse()
+        if !closed { receive() }
     }
 
     private func stateChanged(_ st: NWConnection.State) {

@@ -207,8 +207,9 @@ struct PairSuccessDialog: View {
 
     var body: some View {
         let done = { model.dialog = nil; model.tab = .connection }
+        let name = model.lastPairedName.isEmpty ? model.peerName : model.lastPairedName
         StateDialog(title: L.pairSuccessTitle,
-                    message: L.pairSuccessMessage(model.peerName, controller: model.isController),
+                    message: L.pairSuccessMessage(name, controller: model.isController),
                     onClose: done) {
             Button(L.pairSuccessDone, action: done).buttonStyle(DialogButton(size: 13, padH: 16))
         }
